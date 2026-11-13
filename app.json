@@ -2,7 +2,6 @@
   "expo": {
     "name": "my-app",
     "slug": "my-app",
-    "owner": "yumahazzas-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -36,17 +35,9 @@
           "imageWidth": 76
         }
       ],
-      [
-        "./plugins/withFirebaseBom.js",
-        {
-          "bom": "34.19.0"
-        }
-      ],
       "expo-status-bar",
       "@react-native-firebase/app/app.plugin.js",
-      "@react-native-firebase/auth/app.plugin.js",
-      "expo-image",
-      "expo-web-browser"
+      "@react-native-firebase/auth/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,
