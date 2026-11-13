@@ -37,7 +37,13 @@
       ],
       "expo-status-bar",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      [
+        "./plugins/withFirebaseBom.js",
+        {
+          "bom": "34.19.0"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
