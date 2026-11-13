@@ -36,8 +36,8 @@
         }
       ],
       "expo-status-bar",
-      "@react-native-firebase/app/app.plugin.js",
-      "@react-native-firebase/auth/app.plugin.js"
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth"
     ],
     "experiments": {
       "typedRoutes": true,
