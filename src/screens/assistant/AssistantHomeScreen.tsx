@@ -5,10 +5,13 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { updatePracticumSessionStatus } from '@/services/practicumScheduleService';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -38,13 +41,14 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
 }) => {
   const {
     activeUser,
-    schedules,
-    activeSchedule,
+    activeScheduleId,
     setActiveScheduleId,
-    openSession,
-    closeSession,
     getAttendanceForSchedule,
   } = useApp();
+  const { schedules, loading: schedulesLoading, error: schedulesError } =
+    useFirestoreSchedules(activeUser.id, 'assistant');
+  const activeSchedule =
+    schedules.find(schedule => schedule.id === activeScheduleId) || schedules[0];
 
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
@@ -93,24 +97,28 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     });
   };
 
-  const handleConfirmAction = () => {
+  const handleConfirmAction = async () => {
     const { action, scheduleId } = confirmModal;
-    const target = schedules.find((s) => s.id === scheduleId) || currentSchedule;
-
-    if (action === 'open') {
-      openSession(scheduleId);
-      showNotification(
-        `Sesi "${target?.courseName} - ${target?.className}" berhasil DIBUKA.`,
-        'success'
+    const target = schedules.find(schedule => schedule.id === scheduleId) || currentSchedule;
+    try {
+      await updatePracticumSessionStatus(
+        scheduleId,
+        action === 'open' ? 'DIBUKA' : 'SELESAI',
       );
-    } else {
-      closeSession(scheduleId);
       showNotification(
-        `Sesi "${target?.courseName} - ${target?.className}" telah DITUTUP.`,
-        'info'
+        `Sesi "${target?.courseName} - ${target?.className}" berhasil ${
+          action === 'open' ? 'DIBUKA' : 'DITUTUP'
+        }.`,
+        action === 'open' ? 'success' : 'info',
       );
+    } catch (error) {
+      Alert.alert(
+        'Gagal memperbarui sesi',
+        error instanceof Error ? error.message : 'Periksa koneksi dan Firestore Rules.',
+      );
+    } finally {
+      setConfirmModal({ visible: false, action: 'open', scheduleId: '' });
     }
-    setConfirmModal({ visible: false, action: 'open', scheduleId: '' });
   };
 
   const attendancePercent = currentSchedule && currentSchedule.totalStudents > 0
@@ -121,7 +129,7 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     0
   );
   const openSessions = schedules.filter((schedule) => schedule.status === 'DIBUKA').length;
-  const totalRegistered = currentSchedule?.totalStudents || 20;
+  const totalRegistered = currentSchedule?.totalStudents || 0;
   const hadirCount = attendanceList.length;
   const izinCount = 0;
   const alfaCount = Math.max(0, totalRegistered - hadirCount);
@@ -229,6 +237,22 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
             <Text style={styles.todayBadgeText}>Live view</Text>
           </View>
         </View>
+
+        {schedulesLoading && (
+          <View style={styles.notificationBanner}>
+            <Text style={styles.notificationText}>Memuat jadwal real-time dari Firestore...</Text>
+          </View>
+        )}
+        {!!schedulesError && (
+          <View style={styles.notificationBanner}>
+            <Text style={styles.notificationText}>{schedulesError}</Text>
+          </View>
+        )}
+        {!schedulesLoading && !schedulesError && schedules.length === 0 && (
+          <View style={styles.notificationBanner}>
+            <Text style={styles.notificationText}>Belum ada jadwal yang ditugaskan untuk akun asisten ini.</Text>
+          </View>
+        )}
 
         {/* SRS-AST-001: Active Schedule Hero Card */}
         {currentSchedule && (
