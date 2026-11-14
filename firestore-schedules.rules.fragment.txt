@@ -1,0 +1,48 @@
+// MASUKKAN KE DALAM service cloud.firestore / match /databases/{database}/documents
+// Jangan replace seluruh Firestore Rules milik tim.
+// Pastikan fungsi signedIn() dan currentRole() tidak bentrok dengan helper milik Hana.
+// Kontrak role tim: users/{uid}.role = 'assistant' | 'student'.
+
+function isBirelaAssistant() {
+  return request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant';
+}
+
+function isBirelaStudent() {
+  return request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student';
+}
+
+match /schedules/{scheduleId} {
+  // Assistant hanya membaca jadwal yang ditugaskan pada UID-nya.
+  // Student hanya membaca jadwal saat UID-nya ada dalam enrolledStudents.
+  allow read: if (
+      isBirelaAssistant()
+      && resource.data.assistantId == request.auth.uid
+    ) || (
+      isBirelaStudent()
+      && request.auth.uid in resource.data.enrolledStudents
+    );
+
+  allow create: if isBirelaAssistant()
+    && request.resource.data.assistantId == request.auth.uid
+    && request.resource.data.status == 'BELUM_DIBUKA'
+    && request.resource.data.enrolledStudents is list
+    && request.resource.data.totalStudents == request.resource.data.enrolledStudents.size();
+
+  allow update: if isBirelaAssistant()
+    && resource.data.assistantId == request.auth.uid
+    && request.resource.data.assistantId == resource.data.assistantId
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+      'courseName', 'className', 'room', 'date', 'time',
+      'enrolledStudents', 'totalStudents', 'status', 'updatedAt'
+    ])
+    && request.resource.data.enrolledStudents is list
+    && request.resource.data.totalStudents == request.resource.data.enrolledStudents.size()
+    && request.resource.data.status in ['BELUM_DIBUKA', 'DIBUKA', 'SELESAI'];
+
+  // Jangan hapus jadwal ketika sesi masih dibuka.
+  allow delete: if isBirelaAssistant()
+    && resource.data.assistantId == request.auth.uid
+    && resource.data.status != 'DIBUKA';
+}

@@ -1,0 +1,5 @@
+// MINTA HANA menggabungkan izin baca roster ini ke match /users/{uid} milik Hana.
+// Jangan membuat match /users duplikat jika Hana sudah memiliki match tersebut.
+// Query di aplikasi: where('role', '==', 'student').
+allow list: if request.auth != null
+  && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant';
