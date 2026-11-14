@@ -17,6 +17,7 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "googleServicesFile": "./google-services.json",
       "predictiveBackGestureEnabled": false,
       "package": "com.yumahazza.myapp"
     },
@@ -34,7 +35,15 @@
           "imageWidth": 76
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      [
+        "./plugins/withFirebaseBom.js",
+        {
+          "bom": "34.19.0"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
