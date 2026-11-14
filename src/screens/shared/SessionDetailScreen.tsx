@@ -8,6 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -29,20 +30,18 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   navigation,
 }) => {
   const {
-    activeSchedule,
-    schedules,
-    getAttendanceForSchedule,
+    activeScheduleId,
     activeRole,
     activeUser,
+    getAttendanceForSchedule,
     hasStudentAttended,
     submitAttendance,
   } = useApp();
-
-  const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
+  const { schedules, loading: schedulesLoading, error: schedulesError } =
+    useFirestoreSchedules(activeUser.id, activeRole);
+  const targetScheduleId = navigation.params?.scheduleId || activeScheduleId;
   const currentSchedule =
-    schedules.find((s) => s.id === targetScheduleId) ||
-    activeSchedule ||
-    schedules[0];
+    schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
 
   const attendanceList = useMemo(() => {
     return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
@@ -58,6 +57,22 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   const isAttended = currentSchedule
     ? hasStudentAttended(currentSchedule.id, activeUser.id)
     : false;
+
+  if (schedulesLoading || schedulesError || !currentSchedule) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <AppHeader title="Detail Sesi" onBack={() => navigation.goBack()} />
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>
+            {schedulesLoading ? 'Memuat detail sesi...' : 'Detail sesi tidak tersedia'}
+          </Text>
+          <Text style={styles.emptyDescription}>
+            {schedulesError || 'Jadwal tidak ditemukan atau akunmu tidak terdaftar sebagai peserta.'}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -296,6 +311,25 @@ const styles = StyleSheet.create({
   },
   extraBtn: {
     marginTop: 2,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: APP_SPACING.xl,
+  },
+  emptyTitle: {
+    color: APP_COLORS.navyHeading,
+    fontSize: 17,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyDescription: {
+    color: APP_COLORS.textSecondary,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 8,
   },
 });
 
