@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp, AttendanceResult } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -33,13 +34,16 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
 }) => {
   const {
     activeUser,
-    activeSchedule,
-    schedules,
+    activeScheduleId,
     setActiveScheduleId,
     submitAttendance,
     hasStudentAttended,
     getStudentAttendanceForSchedule,
   } = useApp();
+  const { schedules, loading: schedulesLoading, error: schedulesError } =
+    useFirestoreSchedules(activeUser.id, 'student');
+  const activeSchedule =
+    schedules.find(schedule => schedule.id === activeScheduleId) || schedules[0];
 
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -73,6 +77,35 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
       timestamp: result.timestamp,
     });
   };
+
+  if (schedulesLoading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <AppHeader title="PPK" onNotificationPress={() => navigation.navigate('Notifications')} />
+        <View style={styles.emptyScheduleState}>
+          <Text style={styles.emptyScheduleTitle}>Memuat jadwal...</Text>
+          <Text style={styles.emptyScheduleText}>Menghubungkan ke Cloud Firestore.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (schedulesError || !currentSchedule) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <AppHeader title="PPK" onNotificationPress={() => navigation.navigate('Notifications')} />
+        <View style={styles.emptyScheduleState}>
+          <Text style={styles.emptyScheduleTitle}>
+            {schedulesError ? 'Jadwal belum dapat dimuat' : 'Belum ada jadwal terdaftar'}
+          </Text>
+          <Text style={styles.emptyScheduleText}>
+            {schedulesError || 'Asisten belum memasukkan UID akunmu ke daftar peserta praktikum.'}
+          </Text>
+        </View>
+        <BottomNavigation role="student" activeTab="Home" onTabChange={tabKey => navigation.navigate(tabKey)} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -564,6 +597,25 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
+  },
+  emptyScheduleState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: APP_SPACING.xl,
+  },
+  emptyScheduleTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: APP_COLORS.navyHeading,
+    textAlign: 'center',
+  },
+  emptyScheduleText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 19,
   },
 });
 
