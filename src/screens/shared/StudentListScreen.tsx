@@ -10,6 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { ParticipantRoster } from '@/components/ParticipantRoster';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
@@ -30,19 +32,18 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
   navigation,
 }) => {
   const {
-    activeSchedule,
-    schedules,
+    activeUser,
+    activeScheduleId,
     getAttendanceForSchedule,
     activeRole,
   } = useApp();
-
+  const { schedules, loading: schedulesLoading, error: schedulesError } =
+    useFirestoreSchedules(activeUser.id, 'assistant');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
+  const targetScheduleId = navigation.params?.scheduleId || activeScheduleId;
   const currentSchedule =
-    schedules.find((s) => s.id === targetScheduleId) ||
-    activeSchedule ||
-    schedules[0];
+    schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
 
   const attendanceLogs = useMemo(() => {
     return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
@@ -86,6 +87,16 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
             </View>
           </Card>
         )}
+
+        {schedulesLoading && (
+          <Text style={styles.loadingMessage}>Memuat jadwal dari Firestore...</Text>
+        )}
+        {!!schedulesError && (
+          <Text style={styles.errorMessage}>{schedulesError}</Text>
+        )}
+
+        {/* Birela: daftar peserta kelas yang disinkronkan ke Firestore */}
+        {currentSchedule && <ParticipantRoster schedule={currentSchedule} />}
 
         {/* Search Field */}
         <View style={styles.searchBox}>
@@ -318,6 +329,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
+  },
+  loadingMessage: {
+    color: APP_COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 12,
+  },
+  errorMessage: {
+    color: APP_COLORS.error,
+    fontSize: 12,
+    marginBottom: 12,
   },
 });
 

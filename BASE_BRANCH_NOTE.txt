@@ -1,0 +1,14 @@
+PENTING — BASE BRANCH
+
+Aku memeriksa repository GitHub yumahazza/mobile_apps_project.
+Branch feat/birela-sprint1 masih ada, tetapi main 27 commit lebih maju daripada feat/birela-sprint1.
+Patch ini dibuat dari ZIP mobile_apps_project-main (1).zip yang kamu unggah, yang merupakan snapshot main.
+Karena itu, buat feat/birela-sprint2 dari origin/main, bukan dari feat/birela-sprint1 yang lebih lama.
+
+Perintah:
+  git fetch origin
+  git switch main
+  git pull --ff-only origin main
+  git switch -c feat/birela-sprint2
+
+Jangan merge ke main langsung. Target Pull Request tetap mengikuti keputusan PM.
