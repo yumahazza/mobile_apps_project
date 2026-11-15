@@ -6,10 +6,13 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useStudentAttendanceHistory } from '@/hooks/useStudentAttendanceHistory';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
@@ -29,29 +32,44 @@ interface StudentHistoryScreenProps {
 export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
   navigation,
 }) => {
-  const { activeUser, getStudentHistory } = useApp();
+  const { activeUser } = useApp();
+
+  // Ambil riwayat presensi mahasiswa langsung dari Cloud Firestore (attendances)
+  const {
+    historyRecords,
+    loading: historyLoading,
+    error: historyError,
+  } = useStudentAttendanceHistory(activeUser.id);
+
+  // Ambil daftar jadwal untuk resolusi nama mata praktikum
+  const { schedules } = useFirestoreSchedules(activeUser.id, 'student');
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>('ALL');
 
-  const rawHistoryLogs = getStudentHistory(activeUser.id);
-
-  const sortedLogs = useMemo(() => {
-    return [...rawHistoryLogs].reverse();
-  }, [rawHistoryLogs]);
+  // Gabungkan attendance record dengan metadata schedule
+  const enrichedLogs = useMemo(() => {
+    return historyRecords.map(log => {
+      const schedule = schedules.find(s => s.id === log.scheduleId);
+      return {
+        ...log,
+        schedule,
+      };
+    });
+  }, [historyRecords, schedules]);
 
   const uniqueCourses = useMemo(() => {
     const set = new Set<string>();
-    sortedLogs.forEach((log) => {
+    enrichedLogs.forEach((log) => {
       if (log.schedule?.courseName) {
         set.add(log.schedule.courseName);
       }
     });
     return Array.from(set);
-  }, [sortedLogs]);
+  }, [enrichedLogs]);
 
   const filteredLogs = useMemo(() => {
-    return sortedLogs.filter((log) => {
+    return enrichedLogs.filter((log) => {
       const courseName = (log.schedule?.courseName || '').toLowerCase();
       const dateText = (log.date || '').toLowerCase();
       const timeText = (log.timestamp || '').toLowerCase();
@@ -69,7 +87,7 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
 
       return matchesSearch && matchesCourse;
     });
-  }, [sortedLogs, searchQuery, selectedCourseFilter]);
+  }, [enrichedLogs, searchQuery, selectedCourseFilter]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -97,14 +115,18 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
             </View>
           </View>
 
-          {/* Metrics Tiles */}
+          {/* Metrics Tiles dari data riwayat Firestore */}
           <View style={styles.metricsGrid}>
             <View style={styles.metricTile}>
-              <Text style={styles.metricVal}>{sortedLogs.length}</Text>
+              <Text style={styles.metricVal}>{enrichedLogs.length}</Text>
               <Text style={styles.metricLabel}>Total Hadir</Text>
             </View>
             <View style={styles.metricTile}>
-              <Text style={styles.metricVal}>100%</Text>
+              <Text style={styles.metricVal}>
+                {schedules.length > 0
+                  ? `${Math.round((enrichedLogs.length / schedules.length) * 100)}%`
+                  : '100%'}
+              </Text>
               <Text style={styles.metricLabel}>Kehadiran</Text>
             </View>
             <View style={styles.metricTile}>
@@ -172,8 +194,24 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
           </ScrollView>
         )}
 
+        {/* Loading State */}
+        {historyLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={APP_COLORS.primary} />
+            <Text style={styles.loadingText}>Memuat riwayat kehadiran dari Firestore...</Text>
+          </View>
+        )}
+
+        {/* Error State */}
+        {!!historyError && !historyLoading && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={24} color={APP_COLORS.danger} />
+            <Text style={styles.errorText}>{historyError}</Text>
+          </View>
+        )}
+
         {/* History List or Empty State */}
-        {filteredLogs.length === 0 ? (
+        {!historyLoading && !historyError && filteredLogs.length === 0 ? (
           <EmptyState
             icon="calendar-outline"
             title={
@@ -184,7 +222,7 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
             description={
               searchQuery.trim()
                 ? `Tidak ditemukan riwayat yang sesuai dengan "${searchQuery}".`
-                : 'Anda belum memiliki riwayat presensi yang tercatat.'
+                : 'Anda belum memiliki riwayat presensi yang tercatat di Cloud Firestore.'
             }
           />
         ) : (
@@ -376,6 +414,30 @@ const styles = StyleSheet.create({
   historyMeta: {
     fontSize: 12,
     color: APP_COLORS.textSecondary,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: APP_SPACING.xxl,
+    gap: APP_SPACING.sm,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: APP_SPACING.sm,
+    backgroundColor: '#FEE2E2',
+    padding: APP_SPACING.md,
+    borderRadius: APP_RADIUS.card,
+    marginBottom: APP_SPACING.md,
+  },
+  errorText: {
+    fontSize: 13,
+    color: APP_COLORS.danger,
+    flex: 1,
   },
 });
 

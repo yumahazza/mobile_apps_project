@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,18 @@ import {
   ScrollView,
   Modal,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useApp, AttendanceResult } from '@/context/AppContext';
+import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import {
+  submitPracticumAttendance,
+  subscribeToStudentAttendanceForSchedule,
+} from '@/services/attendanceService';
+import type { AttendanceRecordItem } from '@/types/attendance';
+import { FeedbackSection } from '@/components/FeedbackSection';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -36,7 +43,6 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     activeUser,
     activeScheduleId,
     setActiveScheduleId,
-    submitAttendance,
     hasStudentAttended,
     getStudentAttendanceForSchedule,
   } = useApp();
@@ -44,6 +50,28 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     useFirestoreSchedules(activeUser.id, 'student');
   const activeSchedule =
     schedules.find(schedule => schedule.id === activeScheduleId) || schedules[0];
+
+  const currentSchedule = activeSchedule || schedules[0];
+
+  const [realtimeAttendance, setRealtimeAttendance] = useState<AttendanceRecordItem | null>(null);
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState<boolean>(false);
+
+  // Berlangganan dokumen presensi mahasiswa di Cloud Firestore
+  useEffect(() => {
+    if (!currentSchedule?.id || !activeUser?.id) {
+      return undefined;
+    }
+    const unsubscribe = subscribeToStudentAttendanceForSchedule(
+      currentSchedule.id,
+      activeUser.id,
+      record => setRealtimeAttendance(record),
+      err => console.warn('Attendance listener error:', err),
+    );
+    return () => {
+      unsubscribe();
+      setRealtimeAttendance(null);
+    };
+  }, [currentSchedule?.id, activeUser?.id]);
 
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -56,26 +84,43 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     message: '',
   });
 
-  const currentSchedule = activeSchedule || schedules[0];
-  const isAttended = currentSchedule
-    ? hasStudentAttended(currentSchedule.id, activeUser.id)
-    : false;
+  const isAttended = Boolean(realtimeAttendance) || (
+    currentSchedule ? hasStudentAttended(currentSchedule.id, activeUser.id) : false
+  );
 
-  const studentRecord = currentSchedule
-    ? getStudentAttendanceForSchedule(currentSchedule.id, activeUser.id)
-    : undefined;
+  const studentRecord = realtimeAttendance || (
+    currentSchedule
+      ? getStudentAttendanceForSchedule(currentSchedule.id, activeUser.id)
+      : undefined
+  );
 
   const isSessionOpen = currentSchedule?.status === 'DIBUKA';
 
-  const handleAttendancePress = () => {
+  const handleAttendancePress = async () => {
     if (!currentSchedule) return;
-    const result: AttendanceResult = submitAttendance(currentSchedule.id);
-    setFeedbackModal({
-      visible: true,
-      success: result.success,
-      message: result.message,
-      timestamp: result.timestamp,
-    });
+    try {
+      setIsSubmittingAttendance(true);
+      const res = await submitPracticumAttendance({
+        scheduleId: currentSchedule.id,
+        studentId: activeUser.id,
+        studentName: activeUser.name,
+        nim: activeUser.nim,
+      });
+      setFeedbackModal({
+        visible: true,
+        success: true,
+        message: res.message,
+        timestamp: res.timestamp,
+      });
+    } catch (error) {
+      setFeedbackModal({
+        visible: true,
+        success: false,
+        message: error instanceof Error ? error.message : 'Presensi gagal dicatat ke Firestore.',
+      });
+    } finally {
+      setIsSubmittingAttendance(false);
+    }
   };
 
   if (schedulesLoading) {
@@ -194,15 +239,20 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
                 /* Kasus Sesi Dibuka & Belum Presensi */
                 <View>
                   <CustomButton
-                    title="Presensi Sekarang"
+                    title={isSubmittingAttendance ? 'Mencatat Kehadiran...' : 'Presensi Sekarang'}
                     variant="primary"
                     size="lg"
+                    disabled={isSubmittingAttendance}
                     leftIcon={
-                      <Ionicons
-                        name="checkmark-circle"
-                        size={20}
-                        color={APP_COLORS.white}
-                      />
+                      isSubmittingAttendance ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={20}
+                          color={APP_COLORS.white}
+                        />
+                      )
                     }
                     onPress={handleAttendancePress}
                   />
@@ -241,6 +291,16 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
               )}
             </View>
           </Card>
+        )}
+
+        {/* Form Pesan & Kesan setelah praktikum SELESAI */}
+        {currentSchedule && currentSchedule.status === 'SELESAI' && (
+          <FeedbackSection
+            scheduleId={currentSchedule.id}
+            isSessionFinished={true}
+            studentId={activeUser.id}
+            studentName={activeUser.name}
+          />
         )}
 
         {/* Section Jadwal Hari Ini */}

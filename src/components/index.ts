@@ -13,4 +13,6 @@ export * from './AppHeader';
 export * from './BottomNavigation';
 export * from './SummaryTile';
 export * from './DonutChart';
+export * from './SentimentBadge';
+export * from './FeedbackSection';
 
