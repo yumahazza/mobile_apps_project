@@ -239,16 +239,18 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
-          <CustomButton
-            title="Lihat Daftar Mahasiswa"
-            variant="primary"
-            size="lg"
-            onPress={() =>
-              navigation.navigate('StudentList', {
-                scheduleId: currentSchedule?.id,
-              })
-            }
-          />
+          {activeRole === 'assistant' && (
+            <CustomButton
+              title="Lihat Daftar Mahasiswa"
+              variant="primary"
+              size="lg"
+              onPress={() =>
+                navigation.navigate('StudentList', {
+                  scheduleId: currentSchedule?.id,
+                })
+              }
+            />
+          )}
 
           {/* If Assistant: button to Kontrol Sesi */}
           {activeRole === 'assistant' && (
