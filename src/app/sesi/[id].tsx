@@ -10,6 +10,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { submitPracticumAttendance } from '@/services/attendanceService';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { ResponsiveContainer } from '@/components/ResponsiveContainer';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -25,7 +26,6 @@ export default function SessionDetailScreen() {
     schedules,
     openSession,
     closeSession,
-    submitAttendance,
     getStudentAttendanceForSchedule,
     getAttendanceForSchedule,
   } = useApp();
@@ -69,21 +69,29 @@ export default function SessionDetailScreen() {
   const attendanceList = getAttendanceForSchedule(session.id);
 
   // Presensi praktikan
-  const handleAttendanceSubmit = () => {
+  const handleAttendanceSubmit = async () => {
     if (!activeUser || role !== 'student') return;
 
     setConfirmAttendanceVisible(false);
 
-    const result = submitAttendance(session.id, activeUser);
+    try {
+      const res = await submitPracticumAttendance({
+        scheduleId: session.id,
+        studentId: activeUser.id,
+        studentName: activeUser.name,
+        nim: activeUser.nim,
+      });
 
-    Alert.alert(
-      result.success ? 'Presensi Berhasil!' : 'Presensi Gagal',
-      result.success
-        ? `Presensi berhasil dicatat pada pukul ${
-            result.record?.timestamp ?? result.timestamp ?? '-'
-          }.`
-        : result.message,
-    );
+      Alert.alert(
+        'Presensi Berhasil!',
+        `Presensi berhasil dicatat pada pukul ${res.timestamp}.`,
+      );
+    } catch (error) {
+      Alert.alert(
+        'Presensi Gagal',
+        error instanceof Error ? error.message : 'Presensi gagal dicatat.',
+      );
+    }
   };
 
   // Membuka sesi

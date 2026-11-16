@@ -1,0 +1,92 @@
+// ============================================================================
+// FIRESTORE SECURITY RULES FRAGMENT — MODUL LINTANG (SPRINT 2)
+// Untuk diserahkan kepada Hana (Penanggung Jawab Security Rules) & PM
+// JANGAN menimpa seluruh file firestore.rules tim, masukkan fragmen ini ke dalam:
+// service cloud.firestore { match /databases/{database}/documents { ... } }
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. KOLEKSI ATTENDANCES (Presensi Praktikan Real-Time)
+// Dokumen ID: ${scheduleId}_${studentId}
+// ----------------------------------------------------------------------------
+match /attendances/{attendanceId} {
+  // Praktikan hanya dapat membaca presensinya sendiri.
+  // Asisten hanya dapat membaca rekap presensi untuk jadwal yang ditugaskan padanya.
+  allow read: if request.auth != null && (
+    (
+      // Akses mahasiswa: hanya presensi miliknya sendiri
+      resource.data.studentId == request.auth.uid
+    ) || (
+      // Akses asisten: asisten penanggung jawab jadwal tersebut
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant' &&
+      get(/databases/$(database)/documents/schedules/$(resource.data.scheduleId)).data.assistantId == request.auth.uid
+    )
+  );
+
+  // Praktikan mencatatkan kehadiran:
+  // - Pengguna harus login dan memiliki role 'student'
+  // - studentId pada data dan nama dokumen harus persis sama dengan request.auth.uid
+  // - Sesi praktikum harus berstatus 'DIBUKA'
+  // - Mahasiswa wajib terdaftar dalam daftar peserta enrolledStudents pada jadwal
+  // - Status kehadiran harus 'Hadir'
+  allow create: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'
+    && request.resource.data.studentId == request.auth.uid
+    && attendanceId == request.resource.data.scheduleId + '_' + request.auth.uid
+    && request.resource.data.status == 'Hadir'
+    && get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.status == 'DIBUKA'
+    && request.auth.uid in get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.enrolledStudents;
+
+  // Presensi yang telah dibuat bersifat permanen (immutable) — tidak boleh diubah/ditimpa oleh mahasiswa.
+  allow update, delete: if false;
+}
+
+// ----------------------------------------------------------------------------
+// 2. KOLEKSI FEEDBACKS (Pesan & Kesan Praktikan + Sentimen AI)
+// Dokumen ID: ${scheduleId}_${studentId}
+// ----------------------------------------------------------------------------
+match /feedbacks/{feedbackId} {
+  // Praktikan hanya dapat membaca feedback miliknya.
+  // Asisten dapat membaca seluruh feedback pada sesi yang diampunya.
+  allow read: if request.auth != null && (
+    (
+      resource.data.studentId == request.auth.uid
+    ) || (
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant' &&
+      get(/databases/$(database)/documents/schedules/$(resource.data.scheduleId)).data.assistantId == request.auth.uid
+    )
+  );
+
+  // Praktikan membuat feedback:
+  // - Pengguna harus login dan role 'student'
+  // - studentId harus persis sama dengan request.auth.uid
+  // - Sesi praktikum harus sudah berstatus 'SELESAI'
+  // - Mahasiswa terdaftar di enrolledStudents
+  // - Sentimen harus salah satu dari label yang disepakati
+  allow create: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'
+    && request.resource.data.studentId == request.auth.uid
+    && feedbackId == request.resource.data.scheduleId + '_' + request.auth.uid
+    && request.resource.data.comment is string
+    && request.resource.data.comment.size() >= 5
+    && request.resource.data.comment.size() <= 600
+    && request.resource.data.sentiment in ['Positif', 'Negatif', 'Netral', 'Tidak Terklasifikasi']
+    && get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.status == 'SELESAI'
+    && request.auth.uid in get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.enrolledStudents;
+
+  // Feedback bersifat permanen — tidak dapat diubah atau dihapus oleh praktikan
+  allow update, delete: if false;
+}
+
+// ----------------------------------------------------------------------------
+// 3. CATATAN VALIDASI TRANSISI STATUS SESI PADA /schedules/{scheduleId}
+// (Untuk Hana/Birela pada update rule schedules):
+// ----------------------------------------------------------------------------
+// Pastikan transisi status sesi memenuhi urutan:
+// BELUM_DIBUKA -> DIBUKA -> SELESAI
+// Contoh ekspresi validasi transisi:
+// (
+//   (resource.data.status == 'BELUM_DIBUKA' && request.resource.data.status in ['BELUM_DIBUKA', 'DIBUKA']) ||
+//   (resource.data.status == 'DIBUKA' && request.resource.data.status in ['DIBUKA', 'SELESAI']) ||
+//   (resource.data.status == 'SELESAI' && request.resource.data.status == 'SELESAI')
+// )

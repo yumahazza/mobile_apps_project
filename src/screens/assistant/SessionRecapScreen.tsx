@@ -6,16 +6,21 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
+import { useScheduleFeedbacks } from '@/hooks/useRealtimeFeedback';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { SummaryTile } from '@/components/SummaryTile';
+import { SentimentBadge } from '@/components/SentimentBadge';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
@@ -32,9 +37,13 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
 }) => {
   const {
     activeSchedule,
-    schedules,
-    getAttendanceForSchedule,
+    activeUser,
   } = useApp();
+
+  const { schedules, loading: schedulesLoading } = useFirestoreSchedules(
+    activeUser.id,
+    'assistant',
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -44,23 +53,31 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
     activeSchedule ||
     schedules[0];
 
-  const allAttendanceLogs = useMemo(() => {
-    return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
-  }, [currentSchedule, getAttendanceForSchedule]);
+  // Presensi real-time dari Cloud Firestore
+  const {
+    attendances,
+    stats,
+    loading: attendancesLoading,
+  } = useRealtimeAttendance(
+    currentSchedule?.id,
+    currentSchedule?.totalStudents ?? 0,
+  );
+
+  // Feedback dan sentimen praktikan real-time dari Cloud Firestore
+  const {
+    feedbacks,
+    loading: feedbacksLoading,
+  } = useScheduleFeedbacks(currentSchedule?.id);
 
   const filteredAttendanceLogs = useMemo(() => {
-    if (!searchQuery.trim()) return allAttendanceLogs;
+    if (!searchQuery.trim()) return attendances;
     const q = searchQuery.toLowerCase().trim();
-    return allAttendanceLogs.filter(
+    return attendances.filter(
       (log) =>
         log.studentName.toLowerCase().includes(q) ||
-        (log.nim && log.nim.toLowerCase().includes(q))
+        (log.nim && log.nim.toLowerCase().includes(q)),
     );
-  }, [allAttendanceLogs, searchQuery]);
-
-  const totalRegistered = currentSchedule?.totalStudents || 20;
-  const totalAttended = allAttendanceLogs.length;
-  const totalAbsent = Math.max(0, totalRegistered - totalAttended);
+  }, [attendances, searchQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -92,17 +109,22 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
           </Card>
         )}
 
-        {/* 4 Compact Summary Metrics */}
+        {/* 4 Compact Summary Metrics dari data aktual Firestore */}
         <SummaryTile
-          hadir={totalAttended}
-          izin={0}
-          alfa={totalAbsent}
-          total={totalRegistered}
+          hadir={stats.hadirCount}
+          izin={stats.izinCount}
+          alfa={stats.alfaCount}
+          total={stats.totalRegistered}
         />
 
         {/* Section Daftar Mahasiswa */}
         <View style={styles.studentListSection}>
-          <Text style={styles.sectionTitle}>Daftar Mahasiswa</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Daftar Presensi Mahasiswa</Text>
+            {attendancesLoading && (
+              <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            )}
+          </View>
 
           {/* Search Field */}
           <View style={styles.searchBox}>
@@ -138,7 +160,7 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
               description={
                 searchQuery.trim()
                   ? `Tidak ada data presensi yang cocok dengan kata kunci "${searchQuery}".`
-                  : 'Belum ada catatan presensi praktikan untuk sesi praktikum ini.'
+                  : 'Belum ada catatan presensi praktikan untuk sesi praktikum ini di Firestore.'
               }
             />
           ) : (
@@ -147,6 +169,7 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
               <View style={styles.tableHeaderRow}>
                 <Text style={[styles.tableColHeader, styles.colNo]}>No</Text>
                 <Text style={[styles.tableColHeader, styles.colName]}>Nama</Text>
+                <Text style={[styles.tableColHeader, styles.colTime]}>Waktu</Text>
                 <Text style={[styles.tableColHeader, styles.colStatus]}>Status</Text>
               </View>
 
@@ -172,10 +195,48 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                     </Text>
                     <Text style={styles.studentNimText}>NIM {log.nim}</Text>
                   </View>
+                  <View style={styles.colTime}>
+                    <Text style={styles.timeCellText}>{log.timestamp}</Text>
+                  </View>
                   <View style={styles.colStatus}>
                     <StatusBadge status={log.status} size="sm" />
                   </View>
                 </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Section Pesan & Kesan Peserta (AI Sentiment) */}
+        <View style={styles.feedbackSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Pesan & Kesan Mahasiswa</Text>
+            {feedbacksLoading && (
+              <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            )}
+          </View>
+
+          {feedbacks.length === 0 ? (
+            <Card style={styles.feedbackEmptyCard}>
+              <Ionicons name="chatbubbles-outline" size={24} color={APP_COLORS.neutral400} />
+              <Text style={styles.feedbackEmptyTitle}>Belum Ada Pesan & Kesan</Text>
+              <Text style={styles.feedbackEmptyDesc}>
+                Ulasan dan sentimen dari praktikan setelah sesi selesai akan muncul di sini secara real-time.
+              </Text>
+            </Card>
+          ) : (
+            <View style={styles.feedbackList}>
+              {feedbacks.map((fb) => (
+                <Card key={fb.id} style={styles.feedbackCard}>
+                  <View style={styles.feedbackCardHeader}>
+                    <View style={styles.feedbackAuthorCol}>
+                      <Text style={styles.feedbackAuthorName}>{fb.studentName}</Text>
+                      <Text style={styles.feedbackDateText}>{fb.createdAt || 'Baru saja'}</Text>
+                    </View>
+                    <SentimentBadge sentiment={fb.sentiment} size="sm" />
+                  </View>
+                  <Text style={styles.feedbackCommentText}>"{fb.comment}"</Text>
+                </Card>
               ))}
             </View>
           )}
@@ -239,11 +300,16 @@ const styles = StyleSheet.create({
   studentListSection: {
     marginTop: APP_SPACING.md,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: APP_SPACING.sm,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: APP_COLORS.navyHeading,
-    marginBottom: APP_SPACING.sm,
   },
   searchBox: {
     flexDirection: 'row',
@@ -299,23 +365,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFCFF',
   },
   colNo: {
-    width: 32,
+    width: 28,
     textAlign: 'center',
   },
   colName: {
     flex: 1,
-    paddingHorizontal: APP_SPACING.sm,
+    paddingHorizontal: APP_SPACING.xs,
+  },
+  colTime: {
+    width: 90,
   },
   colStatus: {
-    width: 80,
+    width: 70,
     alignItems: 'flex-end',
   },
   tableCellText: {
-    fontSize: 13,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+  },
+  timeCellText: {
+    fontSize: 11,
     color: APP_COLORS.textSecondary,
   },
   studentNameText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: APP_COLORS.navyHeading,
   },
@@ -326,6 +399,67 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
+  },
+  feedbackSection: {
+    marginTop: APP_SPACING.xl,
+    marginBottom: APP_SPACING.lg,
+  },
+  feedbackEmptyCard: {
+    padding: APP_SPACING.xl,
+    alignItems: 'center',
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  feedbackEmptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: APP_COLORS.navyHeading,
+    marginTop: APP_SPACING.sm,
+    marginBottom: 4,
+  },
+  feedbackEmptyDesc: {
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 17,
+  },
+  feedbackList: {
+    gap: APP_SPACING.sm,
+  },
+  feedbackCard: {
+    padding: APP_SPACING.md,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  feedbackCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: APP_SPACING.xs,
+  },
+  feedbackAuthorCol: {
+    flex: 1,
+  },
+  feedbackAuthorName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: APP_COLORS.navyHeading,
+  },
+  feedbackDateText: {
+    fontSize: 11,
+    color: APP_COLORS.textMuted,
+    marginTop: 1,
+  },
+  feedbackCommentText: {
+    fontSize: 13,
+    color: APP_COLORS.textPrimary,
+    lineHeight: 18,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

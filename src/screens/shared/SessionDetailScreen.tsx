@@ -1,14 +1,23 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
+import {
+  submitPracticumAttendance,
+  subscribeToStudentAttendanceForSchedule,
+} from '@/services/attendanceService';
+import type { AttendanceRecordItem } from '@/types/attendance';
+import { FeedbackSection } from '@/components/FeedbackSection';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -33,9 +42,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
     activeScheduleId,
     activeRole,
     activeUser,
-    getAttendanceForSchedule,
     hasStudentAttended,
-    submitAttendance,
   } = useApp();
   const { schedules, loading: schedulesLoading, error: schedulesError } =
     useFirestoreSchedules(activeUser.id, activeRole);
@@ -43,20 +50,58 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   const currentSchedule =
     schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
 
-  const attendanceList = useMemo(() => {
-    return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
-  }, [currentSchedule, getAttendanceForSchedule]);
+  // Presensi & statistik real-time dari Firestore
+  const { stats } = useRealtimeAttendance(
+    currentSchedule?.id,
+    currentSchedule?.totalStudents ?? 0,
+  );
 
-  const totalRegistered = currentSchedule?.totalStudents || 20;
-  const hadirCount = attendanceList.length;
-  const izinCount = 0;
-  const alfaCount = Math.max(0, totalRegistered - hadirCount);
-  const attendancePercentage =
-    totalRegistered > 0 ? Math.round((hadirCount / totalRegistered) * 100) : 0;
+  const [studentAttendance, setStudentAttendance] = useState<AttendanceRecordItem | null>(null);
+  const [submittingAttendance, setSubmittingAttendance] = useState<boolean>(false);
 
-  const isAttended = currentSchedule
-    ? hasStudentAttended(currentSchedule.id, activeUser.id)
-    : false;
+  useEffect(() => {
+    if (!currentSchedule?.id || activeRole !== 'student' || !activeUser?.id) {
+      setStudentAttendance(null);
+      return undefined;
+    }
+    const unsubscribe = subscribeToStudentAttendanceForSchedule(
+      currentSchedule.id,
+      activeUser.id,
+      record => setStudentAttendance(record),
+      err => console.warn('Attendance listener error:', err),
+    );
+    return () => unsubscribe();
+  }, [currentSchedule?.id, activeUser?.id, activeRole]);
+
+  const isAttended = Boolean(studentAttendance) || (
+    currentSchedule ? hasStudentAttended(currentSchedule.id, activeUser.id) : false
+  );
+
+  const handleStudentAttendance = async () => {
+    if (!currentSchedule) return;
+    try {
+      setSubmittingAttendance(true);
+      const res = await submitPracticumAttendance({
+        scheduleId: currentSchedule.id,
+        studentId: activeUser.id,
+        studentName: activeUser.name,
+        nim: activeUser.nim,
+      });
+      Alert.alert('Presensi Berhasil!', res.message, [
+        {
+          text: 'OK',
+          onPress: () => navigation.navigate('StudentHome'),
+        },
+      ]);
+    } catch (err) {
+      Alert.alert(
+        'Presensi Gagal',
+        err instanceof Error ? err.message : 'Presensi gagal dicatat ke Firestore.',
+      );
+    } finally {
+      setSubmittingAttendance(false);
+    }
+  };
 
   if (schedulesLoading || schedulesError || !currentSchedule) {
     return (
@@ -142,7 +187,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
                 </View>
                 <View style={styles.infoTextCol}>
                   <Text style={styles.infoLabel}>Jumlah Mahasiswa</Text>
-                  <Text style={styles.infoValue}>{totalRegistered}</Text>
+                  <Text style={styles.infoValue}>{stats.totalRegistered}</Text>
                 </View>
               </View>
             </Card>
@@ -154,13 +199,23 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
           <Text style={styles.sectionTitle}>Persentase Kehadiran</Text>
           <Card style={styles.chartCard}>
             <DonutChart
-              percentage={attendancePercentage}
-              hadir={hadirCount}
-              izin={izinCount}
-              alfa={alfaCount}
+              percentage={stats.attendancePercentage}
+              hadir={stats.hadirCount}
+              izin={stats.izinCount}
+              alfa={stats.alfaCount}
             />
           </Card>
         </View>
+
+        {/* Form Pesan & Kesan setelah praktikum SELESAI (Khusus Praktikan) */}
+        {activeRole === 'student' && currentSchedule && (
+          <FeedbackSection
+            scheduleId={currentSchedule.id}
+            isSessionFinished={currentSchedule.status === 'SELESAI'}
+            studentId={activeUser.id}
+            studentName={activeUser.name}
+          />
+        )}
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
@@ -193,14 +248,17 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
           {/* If Student & Session Open & not attended: Presensi Sekarang */}
           {activeRole === 'student' && currentSchedule?.status === 'DIBUKA' && !isAttended && (
             <CustomButton
-              title="Presensi Sekarang"
+              title={submittingAttendance ? 'Mencatat Kehadiran...' : 'Presensi Sekarang'}
               variant="primary"
               size="lg"
+              disabled={submittingAttendance}
               style={styles.extraBtn}
-              onPress={() => {
-                submitAttendance(currentSchedule.id);
-                navigation.navigate('StudentHome');
-              }}
+              leftIcon={
+                submittingAttendance ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : undefined
+              }
+              onPress={handleStudentAttendance}
             />
           )}
         </View>

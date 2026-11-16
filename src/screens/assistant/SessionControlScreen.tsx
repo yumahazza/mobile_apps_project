@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import {
+  openPracticumSession,
+  closePracticumSession,
+  subscribeToSingleSchedule,
+} from '@/services/sessionControlService';
+import type { PracticumSchedule } from '@/services/practicumScheduleService';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -30,15 +39,37 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
 }) => {
   const {
     activeSchedule,
-    schedules,
-    openSession,
-    closeSession,
+    activeUser,
     activeRole,
   } = useApp();
 
+  const { schedules, loading: schedulesLoading } = useFirestoreSchedules(
+    activeUser.id,
+    'assistant',
+  );
+
   const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
+
+  const [realtimeSchedule, setRealtimeSchedule] = useState<PracticumSchedule | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Berlangganan dokumen jadwal spesifik di Firestore secara real-time
+  useEffect(() => {
+    if (!targetScheduleId) return undefined;
+    const unsubscribe = subscribeToSingleSchedule(
+      targetScheduleId,
+      schedule => setRealtimeSchedule(schedule),
+      err => {
+        // Fallback jika listener gagal
+        console.warn('Realtime schedule subscription error:', err);
+      },
+    );
+    return () => unsubscribe();
+  }, [targetScheduleId]);
+
   const currentSchedule =
-    schedules.find((s) => s.id === targetScheduleId) ||
+    realtimeSchedule ||
+    schedules.find(s => s.id === targetScheduleId) ||
     activeSchedule ||
     schedules[0];
 
@@ -58,14 +89,28 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
     setConfirmModal({ visible: true, action: 'close' });
   };
 
-  const handleConfirmAction = () => {
+  const handleConfirmAction = async () => {
     if (!currentSchedule) return;
-    if (confirmModal.action === 'open') {
-      openSession(currentSchedule.id);
-    } else {
-      closeSession(currentSchedule.id);
-    }
+    const action = confirmModal.action;
     setConfirmModal({ visible: false, action: 'open' });
+
+    try {
+      setIsSaving(true);
+      if (action === 'open') {
+        const result = await openPracticumSession(currentSchedule.id, activeUser.id);
+        Alert.alert('Sesi Dibuka', result.message);
+      } else {
+        const result = await closePracticumSession(currentSchedule.id, activeUser.id);
+        Alert.alert('Sesi Ditutup', result.message);
+      }
+    } catch (error) {
+      Alert.alert(
+        'Operasi Gagal',
+        error instanceof Error ? error.message : 'Gagal memperbarui status sesi di Firestore.',
+      );
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const isOpened = currentSchedule?.status === 'DIBUKA';
@@ -84,6 +129,16 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        {/* Loading Banner when Firestore is updating */}
+        {isSaving && (
+          <View style={styles.loadingBanner}>
+            <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            <Text style={styles.loadingBannerText}>
+              Memperbarui status sesi di Cloud Firestore...
+            </Text>
+          </View>
+        )}
+
         {/* Session Info Card */}
         {currentSchedule && (
           <Card style={styles.sessionCard}>
@@ -110,10 +165,10 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
             </View>
             <Text style={styles.statusDescText}>
               {isOpened
-                ? 'Sesi sedang berlangsung'
+                ? 'Sesi sedang berlangsung. Praktikan dapat melakukan presensi.'
                 : isNotOpened
-                ? 'Sesi belum dimulai'
-                : 'Sesi telah ditutup & selesai'}
+                ? 'Sesi belum dimulai. Praktikan belum dapat melakukan presensi.'
+                : 'Sesi telah ditutup & selesai. Presensi telah dinonaktifkan.'}
             </Text>
           </Card>
         )}
@@ -122,10 +177,17 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
         <View style={styles.actionButtonsContainer}>
           {isNotOpened && (
             <CustomButton
-              title="Buka Sesi"
+              title={isSaving ? 'Menyimpan...' : 'Buka Sesi'}
               variant="primary"
               size="lg"
-              leftIcon={<Ionicons name="play" size={18} color={APP_COLORS.white} />}
+              disabled={isSaving || schedulesLoading}
+              leftIcon={
+                isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="play" size={18} color={APP_COLORS.white} />
+                )
+              }
               onPress={handleOpenModal}
             />
           )}
@@ -133,11 +195,16 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
           {isOpened && (
             <>
               <CustomButton
-                title="Tutup Sesi"
+                title={isSaving ? 'Menyimpan...' : 'Tutup Sesi'}
                 variant="primary"
                 size="lg"
+                disabled={isSaving || schedulesLoading}
                 leftIcon={
-                  <Ionicons name="power-outline" size={18} color={APP_COLORS.white} />
+                  isSaving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Ionicons name="power-outline" size={18} color={APP_COLORS.white} />
+                  )
                 }
                 onPress={handleCloseModal}
               />
@@ -145,6 +212,7 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
                 title="Selesaikan Sesi"
                 variant="outline"
                 size="lg"
+                disabled={isSaving || schedulesLoading}
                 style={styles.secondaryActionBtn}
                 leftIcon={
                   <Ionicons
@@ -185,7 +253,7 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
             style={styles.infoIcon}
           />
           <Text style={styles.infoCalloutText}>
-            Setelah sesi ditutup, presensi tidak dapat dilakukan lagi.
+            Setelah sesi ditutup, presensi tidak dapat dilakukan lagi oleh praktikan.
           </Text>
         </View>
       </ScrollView>
@@ -231,6 +299,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.lg,
     paddingTop: APP_SPACING.md,
     paddingBottom: APP_SPACING.xl,
+  },
+  loadingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: APP_SPACING.sm,
+    backgroundColor: APP_COLORS.softBlue,
+    padding: APP_SPACING.md,
+    borderRadius: APP_RADIUS.card,
+    marginBottom: APP_SPACING.md,
+    borderWidth: 1,
+    borderColor: APP_COLORS.lightBlue,
+  },
+  loadingBannerText: {
+    fontSize: 13,
+    color: APP_COLORS.primary,
+    fontWeight: '600',
   },
   sessionCard: {
     padding: APP_SPACING.md,
@@ -287,6 +371,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: APP_COLORS.textSecondary,
     marginTop: 6,
+    lineHeight: 18,
   },
   actionButtonsContainer: {
     gap: APP_SPACING.sm,

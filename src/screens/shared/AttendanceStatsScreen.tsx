@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
 import { Card } from '@/components/Card';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { DonutChart } from '@/components/DonutChart';
 import { NavigationProp } from '@/navigation/navigationTypes';
+import type { PracticumSchedule } from '@/services/practicumScheduleService';
 import {
   APP_COLORS,
   APP_RADIUS,
@@ -23,15 +26,50 @@ interface AttendanceStatsScreenProps {
   navigation: NavigationProp;
 }
 
+/**
+ * Item progress bar per sesi yang terhubung langsung ke Firestore
+ */
+const SessionProgressItem: React.FC<{ schedule: PracticumSchedule }> = ({
+  schedule,
+}) => {
+  const { stats } = useRealtimeAttendance(
+    schedule.id,
+    schedule.totalStudents ?? 0,
+  );
+
+  return (
+    <Card style={styles.barCard}>
+      <View style={styles.barLabelRow}>
+        <Text style={styles.barCourseName}>{schedule.courseName}</Text>
+        <Text style={styles.barPercentText}>{stats.attendancePercentage}%</Text>
+      </View>
+      <View style={styles.progressBarTrack}>
+        <View
+          style={[
+            styles.progressBarFill,
+            { width: `${Math.max(stats.attendancePercentage > 0 ? 5 : 0, Math.min(100, stats.attendancePercentage))}%` },
+          ]}
+        />
+      </View>
+      <View style={styles.barDetailsRow}>
+        <Text style={styles.barDetailsText}>
+          {stats.hadirCount} hadir • {stats.izinCount} izin • {stats.alfaCount} belum hadir (dari {stats.totalRegistered} mahasiswa)
+        </Text>
+      </View>
+    </Card>
+  );
+};
+
 export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
   navigation,
 }) => {
   const {
     activeSchedule,
-    schedules,
-    getAttendanceForSchedule,
     activeRole,
+    activeUser,
   } = useApp();
+
+  const { schedules } = useFirestoreSchedules(activeUser.id, activeRole);
 
   const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
   const currentSchedule =
@@ -39,16 +77,10 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
     activeSchedule ||
     schedules[0];
 
-  const attendanceList = useMemo(() => {
-    return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
-  }, [currentSchedule, getAttendanceForSchedule]);
-
-  const totalRegistered = currentSchedule?.totalStudents || 20;
-  const hadirCount = attendanceList.length;
-  const izinCount = 0;
-  const alfaCount = Math.max(0, totalRegistered - hadirCount);
-  const attendancePercentage =
-    totalRegistered > 0 ? Math.round((hadirCount / totalRegistered) * 100) : 0;
+  const { stats } = useRealtimeAttendance(
+    currentSchedule?.id,
+    currentSchedule?.totalStudents ?? 0,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -82,10 +114,10 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
         {/* Donut Chart Card */}
         <Card style={styles.chartCard}>
           <DonutChart
-            percentage={attendancePercentage}
-            hadir={hadirCount}
-            izin={izinCount}
-            alfa={alfaCount}
+            percentage={stats.attendancePercentage}
+            hadir={stats.hadirCount}
+            izin={stats.izinCount}
+            alfa={stats.alfaCount}
           />
         </Card>
 
@@ -94,28 +126,9 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
           <Text style={styles.sectionTitle}>Per Sesi</Text>
 
           <View style={styles.barsList}>
-            {schedules.map((schedule) => {
-              const count = getAttendanceForSchedule(schedule.id).length;
-              const total = schedule.totalStudents || 20;
-              const percent = total > 0 ? Math.round((count / total) * 100) : 0;
-
-              return (
-                <Card key={schedule.id} style={styles.barCard}>
-                  <View style={styles.barLabelRow}>
-                    <Text style={styles.barCourseName}>{schedule.courseName}</Text>
-                    <Text style={styles.barPercentText}>{percent}%</Text>
-                  </View>
-                  <View style={styles.progressBarTrack}>
-                    <View
-                      style={[
-                        styles.progressBarFill,
-                        { width: `${Math.max(5, Math.min(100, percent))}%` },
-                      ]}
-                    />
-                  </View>
-                </Card>
-              );
-            })}
+            {schedules.map((schedule) => (
+              <SessionProgressItem key={schedule.id} schedule={schedule} />
+            ))}
           </View>
         </View>
       </ScrollView>
@@ -226,6 +239,13 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: APP_COLORS.accentBlue,
     borderRadius: 4,
+  },
+  barDetailsRow: {
+    marginTop: 6,
+  },
+  barDetailsText: {
+    fontSize: 11,
+    color: APP_COLORS.textMuted,
   },
 });
 
