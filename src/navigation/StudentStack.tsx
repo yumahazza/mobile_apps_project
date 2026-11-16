@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StudentHomeScreen } from '@/screens/student/StudentHomeScreen';
 import { StudentHistoryScreen } from '@/screens/student/StudentHistoryScreen';
+import { LeaveRequestScreen } from '@/screens/student/LeaveRequestScreen';
 import { ScheduleScreen } from '@/screens/shared/ScheduleScreen';
 import { SessionDetailScreen } from '@/screens/shared/SessionDetailScreen';
 import { AttendanceDetailScreen } from '@/screens/shared/AttendanceDetailScreen';
@@ -75,6 +76,9 @@ export const StudentStack: React.FC = () => {
       )}
       {currentScreen === 'Notifications' && (
         <NotificationScreen navigation={navigation} />
+      )}
+      {currentScreen === 'LeaveRequest' && (
+        <LeaveRequestScreen navigation={navigation} />
       )}
     </View>
   );

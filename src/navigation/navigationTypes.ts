@@ -20,12 +20,14 @@ export type AssistantScreenName =
   | 'StudentList'
   | 'AttendanceDetail'
   | 'AttendanceStats'
+  | 'LeaveApproval'
   | 'Notifications';
 
 export type StudentScreenName =
   | 'StudentHome'
   | 'ScheduleList'
   | 'StudentHistory'
+  | 'LeaveRequest'
   | 'Profile'
   | 'SessionDetail'
   | 'AttendanceDetail'

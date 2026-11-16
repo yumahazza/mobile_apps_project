@@ -1,0 +1,66 @@
+// ============================================================================
+// FIRESTORE SECURITY RULES FRAGMENT — MODUL FRITZ (SPRINT 2)
+// Untuk diserahkan kepada Hana (Penanggung Jawab Security Rules) & PM
+// JANGAN menimpa seluruh file firestore.rules tim, masukkan fragmen ini ke dalam:
+// service cloud.firestore { match /databases/{database}/documents { ... } }
+// ============================================================================
+
+// ----------------------------------------------------------------------------
+// 1. KOLEKSI LEAVE_REQUESTS (Pengajuan Izin Praktikan + Klasifikasi AI + Approval Asisten)
+// Dokumen ID: ${scheduleId}_${studentId}
+// ----------------------------------------------------------------------------
+match /leave_requests/{leaveId} {
+  // Praktikan hanya dapat membaca pengajuan izinnya sendiri.
+  // Asisten dapat membaca pengajuan izin pada jadwal praktikum yang diampunya.
+  allow read: if request.auth != null && (
+    (
+      resource.data.studentId == request.auth.uid
+    ) || (
+      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant' &&
+      get(/databases/$(database)/documents/schedules/$(resource.data.scheduleId)).data.assistantId == request.auth.uid
+    )
+  );
+
+  // Praktikan mengajukan izin:
+  // - Pengguna login dan memiliki role 'student'
+  // - studentId pada dokumen wajib sama dengan request.auth.uid
+  // - ID dokumen wajib berformat ${scheduleId}_${studentId} (mencegah pengajuan ganda)
+  // - Status awal wajib 'MENUNGGU' (AI tidak pernah otomatis menerima/menolak)
+  // - aiStatus wajib 'SUCCESS' atau 'FALLBACK'
+  // - Alasan izin minimal 5 karakter dan maksimal 500 karakter
+  // - Sesi praktikum belum berstatus 'SELESAI'
+  // - Mahasiswa terdaftar pada enrolledStudents jadwal tersebut
+  allow create: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'student'
+    && request.resource.data.studentId == request.auth.uid
+    && leaveId == request.resource.data.scheduleId + '_' + request.auth.uid
+    && request.resource.data.status == 'MENUNGGU'
+    && request.resource.data.aiStatus in ['SUCCESS', 'FALLBACK']
+    && request.resource.data.reason is string
+    && request.resource.data.reason.size() >= 5
+    && request.resource.data.reason.size() <= 500
+    && get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.status != 'SELESAI'
+    && request.auth.uid in get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.enrolledStudents;
+
+  // Asisten memeriksa & memutuskan pengajuan izin ('DITERIMA' / 'DITOLAK'):
+  // - Pengguna login dan memiliki role 'assistant'
+  // - Asisten adalah pengampu jadwal praktikum tersebut
+  // - Hanya field keputusan (status, reviewedBy, reviewedAt) yang boleh diubah
+  allow update: if request.auth != null
+    && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant'
+    && get(/databases/$(database)/documents/schedules/$(resource.data.scheduleId)).data.assistantId == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reviewedBy', 'reviewedAt'])
+    && request.resource.data.status in ['DITERIMA', 'DITOLAK'];
+
+  allow delete: if false;
+}
+
+// ----------------------------------------------------------------------------
+// 2. TAMBAHAN ATURAN SINKRONISASI STATUS 'Izin' PADA /attendances/{attendanceId}
+// (Agar Asisten dapat mencatat status 'Izin' saat menyetujui leave_request):
+// ----------------------------------------------------------------------------
+// Pada match /attendances/{attendanceId}, tambahkan izin write/create/update bagi Asisten:
+// allow create, update: if request.auth != null
+//   && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assistant'
+//   && get(/databases/$(database)/documents/schedules/$(request.resource.data.scheduleId)).data.assistantId == request.auth.uid
+//   && request.resource.data.status == 'Izin';

@@ -84,6 +84,24 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       iconName = 'alert-circle-outline';
       displayLabel = displayLabel || 'ERROR';
       break;
+    case 'MENUNGGU':
+      backgroundColor = APP_COLORS.notOpenedSoft;
+      textColor = APP_COLORS.notOpened;
+      iconName = 'time-outline';
+      displayLabel = displayLabel || 'MENUNGGU';
+      break;
+    case 'DITERIMA':
+      backgroundColor = APP_COLORS.openedSoft;
+      textColor = APP_COLORS.opened;
+      iconName = 'checkmark-circle-outline';
+      displayLabel = displayLabel || 'DITERIMA';
+      break;
+    case 'DITOLAK':
+      backgroundColor = APP_COLORS.errorSoft;
+      textColor = APP_COLORS.error;
+      iconName = 'close-circle-outline';
+      displayLabel = displayLabel || 'DITOLAK';
+      break;
     default:
       displayLabel = displayLabel || normalized;
       break;
