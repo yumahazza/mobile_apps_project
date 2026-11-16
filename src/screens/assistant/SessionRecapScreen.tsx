@@ -15,6 +15,7 @@ import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
 import { useScheduleFeedbacks } from '@/hooks/useRealtimeFeedback';
 import { Card } from '@/components/Card';
+import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
@@ -116,6 +117,34 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
           alfa={stats.alfaCount}
           total={stats.totalRegistered}
         />
+
+        {/* Tombol Pemeriksaan Pengajuan Izin Sesi Ini (Fritz - Sprint 2) */}
+        {currentSchedule && (
+          <CustomButton
+            title="Periksa Pengajuan Izin Sesi Ini (AI)"
+            variant="secondary"
+            size="md"
+            leftIcon={
+              <Ionicons
+                name="document-text-outline"
+                size={18}
+                color={APP_COLORS.primary}
+              />
+            }
+            rightIcon={
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={APP_COLORS.primary}
+              />
+            }
+            onPress={() =>
+              navigation.navigate('LeaveApproval', {
+                scheduleId: currentSchedule.id,
+              })
+            }
+          />
+        )}
 
         {/* Section Daftar Mahasiswa */}
         <View style={styles.studentListSection}>

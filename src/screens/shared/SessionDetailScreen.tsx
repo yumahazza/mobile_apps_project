@@ -18,6 +18,7 @@ import {
 } from '@/services/attendanceService';
 import type { AttendanceRecordItem } from '@/types/attendance';
 import { FeedbackSection } from '@/components/FeedbackSection';
+import { LeaveRequestSection } from '@/components/LeaveRequestSection';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -207,6 +208,25 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
           </Card>
         </View>
 
+        {/* Pengajuan Izin & Status Izin Real-time (Khusus Praktikan - Fritz) */}
+        {activeRole === 'student' && currentSchedule && (
+          <LeaveRequestSection
+            scheduleId={currentSchedule.id}
+            courseName={currentSchedule.courseName}
+            className={currentSchedule.className}
+            sessionStatus={currentSchedule.status}
+            studentId={activeUser.id}
+            studentName={activeUser.name}
+            nim={activeUser.nim}
+            isAttended={isAttended && studentAttendance?.status === 'Hadir'}
+            onNavigateToLeaveScreen={() =>
+              navigation.navigate('LeaveRequest', {
+                scheduleId: currentSchedule.id,
+              })
+            }
+          />
+        )}
+
         {/* Form Pesan & Kesan setelah praktikum SELESAI (Khusus Praktikan) */}
         {activeRole === 'student' && currentSchedule && (
           <FeedbackSection
@@ -239,6 +259,21 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
               style={styles.extraBtn}
               onPress={() =>
                 navigation.navigate('SessionControl', {
+                  scheduleId: currentSchedule?.id,
+                })
+              }
+            />
+          )}
+
+          {/* If Assistant: button to Pemeriksaan Izin (Fritz) */}
+          {activeRole === 'assistant' && (
+            <CustomButton
+              title="Periksa Pengajuan Izin (AI)"
+              variant="outline"
+              size="lg"
+              style={styles.extraBtn}
+              onPress={() =>
+                navigation.navigate('LeaveApproval', {
                   scheduleId: currentSchedule?.id,
                 })
               }

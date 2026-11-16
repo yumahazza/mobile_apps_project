@@ -15,4 +15,6 @@ export * from './SummaryTile';
 export * from './DonutChart';
 export * from './SentimentBadge';
 export * from './FeedbackSection';
+export * from './LeaveClassificationBadge';
+export * from './LeaveRequestSection';
 

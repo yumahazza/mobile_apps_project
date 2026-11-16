@@ -18,6 +18,7 @@ import {
 } from '@/services/attendanceService';
 import type { AttendanceRecordItem } from '@/types/attendance';
 import { FeedbackSection } from '@/components/FeedbackSection';
+import { LeaveRequestSection } from '@/components/LeaveRequestSection';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
@@ -291,6 +292,25 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
               )}
             </View>
           </Card>
+        )}
+
+        {/* Pengajuan Izin & Status Izin Real-time (Fritz) */}
+        {currentSchedule && (
+          <LeaveRequestSection
+            scheduleId={currentSchedule.id}
+            courseName={currentSchedule.courseName}
+            className={currentSchedule.className}
+            sessionStatus={currentSchedule.status}
+            studentId={activeUser.id}
+            studentName={activeUser.name}
+            nim={activeUser.nim}
+            isAttended={isAttended && studentRecord?.status === 'Hadir'}
+            onNavigateToLeaveScreen={() =>
+              navigation.navigate('LeaveRequest', {
+                scheduleId: currentSchedule.id,
+              })
+            }
+          />
         )}
 
         {/* Form Pesan & Kesan setelah praktikum SELESAI */}

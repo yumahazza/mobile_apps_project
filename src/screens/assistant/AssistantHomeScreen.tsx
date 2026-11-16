@@ -13,6 +13,7 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { updatePracticumSessionStatus } from '@/services/practicumScheduleService';
 import { Card } from '@/components/Card';
+import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { AppHeader } from '@/components/AppHeader';
@@ -370,6 +371,34 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
           alfa={alfaCount}
           total={totalRegistered}
         />
+
+        {/* Shortcut Pemeriksaan Pengajuan Izin (Fritz - Sprint 2) */}
+        {currentSchedule && (
+          <CustomButton
+            title="Periksa Pengajuan Izin Mahasiswa (AI)"
+            variant="secondary"
+            size="md"
+            leftIcon={
+              <Ionicons
+                name="document-text-outline"
+                size={18}
+                color={APP_COLORS.primary}
+              />
+            }
+            rightIcon={
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={APP_COLORS.primary}
+              />
+            }
+            onPress={() =>
+              navigation.navigate('LeaveApproval', {
+                scheduleId: currentSchedule.id,
+              })
+            }
+          />
+        )}
 
         {/* Section Jadwal Hari Ini */}
         <View style={styles.sectionHeaderRow}>
