@@ -4,12 +4,12 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Memeriksa status login pengguna.
+    // AUTENTIKASI DAN ROLE
+
     function signedIn() {
       return request.auth != null;
     }
 
-    // Mengambil role pengguna yang sedang login.
     function currentRole() {
       return get(
         /databases/$(database)/documents/users/$(request.auth.uid)
@@ -24,27 +24,97 @@ service cloud.firestore {
       return signedIn() && currentRole() == 'student';
     }
 
-    // ==========================================
-    // USERS: profil dan daftar praktikan
-    // ==========================================
+    // JADWAL
+
+    function scheduleExists(scheduleId) {
+      return exists(
+        /databases/$(database)/documents/schedules/$(scheduleId)
+      );
+    }
+
+    function scheduleData(scheduleId) {
+      return get(
+        /databases/$(database)/documents/schedules/$(scheduleId)
+      ).data;
+    }
+
+    function ownsSchedule(scheduleId) {
+      return isAssistant()
+        && scheduleExists(scheduleId)
+        && scheduleData(scheduleId).assistantId == request.auth.uid;
+    }
+
+    function enrolledInSchedule(scheduleId) {
+      return isStudent()
+        && scheduleExists(scheduleId)
+        && request.auth.uid in scheduleData(scheduleId).enrolledStudents;
+    }
+
+    function validSessionTransition() {
+      return request.resource.data.status == resource.data.status
+        || (
+          resource.data.status == 'BELUM_DIBUKA'
+          && request.resource.data.status == 'DIBUKA'
+        )
+        || (
+          resource.data.status == 'DIBUKA'
+          && request.resource.data.status == 'SELESAI'
+        );
+    }
+
+    // HELPER PEMBACAAN DOKUMEN YANG BELUM ADA
+
+    // Dipakai hanya untuk GET dokumen yang belum ada.
+    // Tidak memberikan akses terhadap dokumen milik orang lain.
+    function missingOwnStudentDocument(documentId) {
+      return isStudent()
+        && resource == null
+        && documentId.matches('.*_' + request.auth.uid);
+    }
+
+    // Asisten boleh memeriksa presensi yang belum ada
+    // jika ada pengajuan izin pada ID yang sama
+    // dan jadwal tersebut memang miliknya.
+    function missingAttendanceForOwner(attendanceId) {
+      return isAssistant()
+        && resource == null
+        && exists(
+          /databases/$(database)/documents/leave_requests/$(attendanceId)
+        )
+        && ownsSchedule(
+          get(
+            /databases/$(database)/documents/leave_requests/$(attendanceId)
+          ).data.scheduleId
+        )
+        && attendanceId == (
+          get(
+            /databases/$(database)/documents/leave_requests/$(attendanceId)
+          ).data.scheduleId
+          + '_'
+          + get(
+            /databases/$(database)/documents/leave_requests/$(attendanceId)
+          ).data.studentId
+        );
+    }
+
+    // USERS
+
     match /users/{uid} {
 
-      // Pengguna dapat membaca profilnya sendiri.
-      // Asisten juga dapat membaca profil pengguna.
       allow get: if signedIn()
         && (
           request.auth.uid == uid
           || isAssistant()
         );
 
-      // Hanya asisten yang boleh mengambil daftar praktikan.
       allow list: if isAssistant();
 
-      // Registrasi publik hanya boleh membuat profil student.
       allow create: if signedIn()
         && request.auth.uid == uid
+        && request.resource.data.uid == uid
         && request.resource.data.role == 'student'
         && request.resource.data.keys().hasAll([
+          'uid',
           'name',
           'email',
           'role',
@@ -52,6 +122,7 @@ service cloud.firestore {
           'updatedAt'
         ])
         && request.resource.data.keys().hasOnly([
+          'uid',
           'name',
           'email',
           'role',
@@ -63,8 +134,6 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.email is string;
 
-      // Pengguna boleh memperbarui informasi profil tertentu,
-      // tetapi tidak boleh mengubah role-nya sendiri.
       allow update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.role == resource.data.role
@@ -76,17 +145,13 @@ service cloud.firestore {
             'updatedAt'
           ]);
 
-      // Penghapusan profil tidak diizinkan melalui aplikasi.
       allow delete: if false;
     }
 
-    // ==========================================
-    // SCHEDULES: jadwal praktikum
-    // ==========================================
+    // SCHEDULES
+
     match /schedules/{scheduleId} {
 
-      // Asisten hanya membaca jadwal miliknya.
-      // Student hanya membaca jadwal yang diikutinya.
       allow read: if (
         isAssistant()
         && resource.data.assistantId == request.auth.uid
@@ -95,7 +160,6 @@ service cloud.firestore {
         && request.auth.uid in resource.data.enrolledStudents
       );
 
-      // Hanya asisten yang boleh membuat jadwal untuk dirinya.
       allow create: if isAssistant()
         && request.resource.data.assistantId == request.auth.uid
         && request.resource.data.status == 'BELUM_DIBUKA'
@@ -103,8 +167,6 @@ service cloud.firestore {
         && request.resource.data.totalStudents
           == request.resource.data.enrolledStudents.size();
 
-      // Asisten hanya boleh mengubah jadwal miliknya
-      // dan hanya pada field yang ditentukan.
       allow update: if isAssistant()
         && resource.data.assistantId == request.auth.uid
         && request.resource.data.assistantId
@@ -128,15 +190,256 @@ service cloud.firestore {
           'BELUM_DIBUKA',
           'DIBUKA',
           'SELESAI'
-        ];
+        ]
+        && validSessionTransition();
 
-      // Jadwal yang sedang dibuka tidak boleh dihapus.
       allow delete: if isAssistant()
         && resource.data.assistantId == request.auth.uid
         && resource.data.status != 'DIBUKA';
     }
 
-    // Koleksi lain tetap ditolak sampai aturan
-    // aksesnya disepakati dan ditambahkan oleh tim.
+    // ATTENDANCES
+
+    match /attendances/{attendanceId} {
+
+      allow get: if signedIn() && (
+        (
+          resource != null
+          && (
+            (
+              isStudent()
+              && resource.data.studentId == request.auth.uid
+            )
+            || ownsSchedule(resource.data.scheduleId)
+          )
+        )
+        || missingOwnStudentDocument(attendanceId)
+        || missingAttendanceForOwner(attendanceId)
+      );
+
+      allow list: if signedIn() && (
+        (
+          isStudent()
+          && resource.data.studentId == request.auth.uid
+        )
+        || ownsSchedule(resource.data.scheduleId)
+      );
+
+      // Presensi Hadir oleh praktikan.
+      allow create: if isStudent()
+        && request.resource.data.scheduleId is string
+        && request.resource.data.studentId == request.auth.uid
+        && attendanceId ==
+          request.resource.data.scheduleId + '_' + request.auth.uid
+        && enrolledInSchedule(request.resource.data.scheduleId)
+        && scheduleData(request.resource.data.scheduleId).status
+          == 'DIBUKA'
+        && request.resource.data.keys().hasAll([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'nim',
+          'timestamp',
+          'date',
+          'status'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'nim',
+          'timestamp',
+          'date',
+          'status'
+        ])
+        && request.resource.data.studentName is string
+        && request.resource.data.nim is string
+        && request.resource.data.date is string
+        && request.resource.data.status == 'Hadir'
+        && request.resource.data.timestamp == request.time;
+
+      // Presensi Izin harus dibuat dalam transaksi
+      // yang sekaligus menyetujui leave request.
+      allow create: if isAssistant()
+        && request.resource.data.scheduleId is string
+        && request.resource.data.studentId is string
+        && attendanceId ==
+          request.resource.data.scheduleId
+          + '_'
+          + request.resource.data.studentId
+        && ownsSchedule(request.resource.data.scheduleId)
+        && request.resource.data.keys().hasAll([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'nim',
+          'timestamp',
+          'date',
+          'status'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'nim',
+          'timestamp',
+          'date',
+          'status'
+        ])
+        && request.resource.data.studentName is string
+        && request.resource.data.nim is string
+        && request.resource.data.date is string
+        && request.resource.data.status == 'Izin'
+        && request.resource.data.timestamp == request.time
+        && exists(
+          /databases/$(database)/documents/leave_requests/$(attendanceId)
+        )
+        && get(
+          /databases/$(database)/documents/leave_requests/$(attendanceId)
+        ).data.status == 'MENUNGGU'
+        && getAfter(
+          /databases/$(database)/documents/leave_requests/$(attendanceId)
+        ).data.status == 'DITERIMA';
+
+      allow update, delete: if false;
+    }
+
+    // FEEDBACKS
+
+    match /feedbacks/{feedbackId} {
+
+      allow get: if signedIn() && (
+        (
+          isStudent()
+          && resource.data.studentId == request.auth.uid
+        )
+        || ownsSchedule(resource.data.scheduleId)
+      );
+
+      allow list: if ownsSchedule(resource.data.scheduleId);
+
+      allow create: if isStudent()
+        && request.resource.data.scheduleId is string
+        && request.resource.data.studentId == request.auth.uid
+        && feedbackId ==
+          request.resource.data.scheduleId + '_' + request.auth.uid
+        && enrolledInSchedule(request.resource.data.scheduleId)
+        && scheduleData(request.resource.data.scheduleId).status
+          == 'SELESAI'
+        && request.resource.data.keys().hasAll([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'comment',
+          'sentiment',
+          'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'scheduleId',
+          'studentId',
+          'studentName',
+          'comment',
+          'sentiment',
+          'createdAt'
+        ])
+        && request.resource.data.studentName is string
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() >= 5
+        && request.resource.data.comment.size() <= 500
+        && request.resource.data.sentiment in [
+          'Positif',
+          'Negatif',
+          'Netral',
+          'Tidak Terklasifikasi'
+        ]
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    // LEAVE REQUESTS
+
+    match /leave_requests/{leaveId} {
+
+      allow get: if signedIn() && (
+        (
+          resource != null
+          && (
+            (
+              isStudent()
+              && resource.data.studentId == request.auth.uid
+            )
+            || ownsSchedule(resource.data.scheduleId)
+          )
+        )
+        || missingOwnStudentDocument(leaveId)
+      );
+
+      allow list: if signedIn() && (
+        (
+          isStudent()
+          && resource.data.studentId == request.auth.uid
+        )
+        || ownsSchedule(resource.data.scheduleId)
+      );
+
+      // Pengajuan izin oleh praktikan.
+      allow create: if isStudent()
+        && request.resource.data.scheduleId is string
+        && request.resource.data.studentId == request.auth.uid
+        && leaveId ==
+          request.resource.data.scheduleId + '_' + request.auth.uid
+        && enrolledInSchedule(request.resource.data.scheduleId)
+        && scheduleData(request.resource.data.scheduleId).status
+          != 'SELESAI'
+        && request.resource.data.status == 'MENUNGGU'
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 5
+        && request.resource.data.reason.size() <= 500
+        && request.resource.data.aiStatus in [
+          'SUCCESS',
+          'FALLBACK'
+        ]
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null;
+
+      // Asisten hanya boleh memutuskan satu kali.
+      // Jika DITERIMA, presensi Izin wajib terbentuk
+      // dalam transaksi yang sama.
+      allow update: if ownsSchedule(resource.data.scheduleId)
+        && resource.data.status == 'MENUNGGU'
+        && request.resource.data.status in [
+          'DITERIMA',
+          'DITOLAK'
+        ]
+        && request.resource.data.reviewedBy is string
+        && request.resource.data.reviewedAt == request.time
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly([
+            'status',
+            'reviewedBy',
+            'reviewedAt'
+          ])
+        && (
+          request.resource.data.status == 'DITOLAK'
+          || (
+            !exists(
+              /databases/$(database)/documents/attendances/$(leaveId)
+            )
+            && getAfter(
+              /databases/$(database)/documents/attendances/$(leaveId)
+            ).data.status == 'Izin'
+            && getAfter(
+              /databases/$(database)/documents/attendances/$(leaveId)
+            ).data.scheduleId == resource.data.scheduleId
+            && getAfter(
+              /databases/$(database)/documents/attendances/$(leaveId)
+            ).data.studentId == resource.data.studentId
+          )
+        );
+
+      allow delete: if false;
+    }
   }
 }

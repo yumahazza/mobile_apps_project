@@ -5,7 +5,6 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from '@react-native-firebase/auth';
-
 import {
   getFirestore,
   collection,
@@ -14,7 +13,6 @@ import {
   getDoc,
   serverTimestamp,
 } from '@react-native-firebase/firestore';
-
 import type { User, UserRole } from '@/data/users';
 
 interface RegisterProfile {
@@ -23,10 +21,6 @@ interface RegisterProfile {
   department?: string;
 }
 
-/**
- * Registrasi akun baru.
- * Registrasi publik hanya boleh membuat akun student.
- */
 export async function registerWithEmail(
   email: string,
   password: string,
@@ -39,35 +33,47 @@ export async function registerWithEmail(
     throw new Error('Nama wajib diisi.');
   }
 
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new Error('Format email tidak valid.');
+  }
+
+  if (password.length < 6) {
+    throw new Error('Password minimal 6 karakter.');
+  }
+
   const credential = await createUserWithEmailAndPassword(
     getAuth(),
     normalizedEmail,
     password,
   );
 
-  const userRef = doc(
-    collection(getFirestore(), 'users'),
-    credential.user.uid,
-  );
+  const uid = credential.user.uid;
+  const userRef = doc(collection(getFirestore(), 'users'), uid);
 
-  await setDoc(userRef, {
-    name: normalizedName,
-    email: credential.user.email ?? normalizedEmail,
-    role: 'student',
-    ...(profile.nim?.trim()
-      ? { nim: profile.nim.trim() }
-      : {}),
-    ...(profile.department?.trim()
-      ? { department: profile.department.trim() }
-      : {}),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  try {
+    await setDoc(userRef, {
+      uid,
+      name: normalizedName,
+      email: credential.user.email ?? normalizedEmail,
+      role: 'student',
+      ...(profile.nim?.trim()
+        ? { nim: profile.nim.trim() }
+        : {}),
+      ...(profile.department?.trim()
+        ? { department: profile.department.trim() }
+        : {}),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } catch (error) {
+    throw new Error(
+      'Akun Firebase berhasil dibuat, tetapi profil gagal ' +
+        'disimpan ke Firestore. Periksa koneksi dan aturan ' +
+        'keamanan Firestore sebelum mencoba login kembali.',
+    );
+  }
 }
 
-/**
- * Login dengan email dan password.
- */
 export async function signInWithEmail(
   email: string,
   password: string,
@@ -79,17 +85,13 @@ export async function signInWithEmail(
   );
 }
 
-/**
- * Logout dari Firebase Authentication.
- */
 export async function signOut(): Promise<void> {
   await firebaseSignOut(getAuth());
 }
 
-/**
- * Mengambil profil pengguna berdasarkan Firebase UID.
- */
-export async function getUserProfile(uid: string): Promise<User> {
+export async function getUserProfile(
+  uid: string,
+): Promise<User> {
   const userRef = doc(
     collection(getFirestore(), 'users'),
     uid,
@@ -110,7 +112,9 @@ export async function getUserProfile(uid: string): Promise<User> {
     typeof data.email !== 'string' ||
     (data.role !== 'assistant' && data.role !== 'student')
   ) {
-    throw new Error('Data profil pengguna tidak valid.');
+    throw new Error(
+      'Data profil pengguna tidak valid.',
+    );
   }
 
   const role: UserRole = data.role;

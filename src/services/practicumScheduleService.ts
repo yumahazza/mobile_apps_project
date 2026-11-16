@@ -97,10 +97,14 @@ export function validateScheduleInput(input: ScheduleInput): string | null {
     return 'Tanggal harus menggunakan format YYYY-MM-DD.';
   }
 
-  const parsedDate = new Date(`${input.date}T00:00:00`);
+  const [year, month, day] = input.date.split('-').map(Number);
+
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
   if (
     Number.isNaN(parsedDate.getTime()) ||
-    parsedDate.toISOString().slice(0, 10) !== input.date
+    parsedDate.getUTCFullYear() !== year ||
+    parsedDate.getUTCMonth() + 1 !== month ||
+    parsedDate.getUTCDate() !== day
   ) {
     return 'Tanggal tidak valid.';
   }

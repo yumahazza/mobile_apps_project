@@ -21,7 +21,7 @@ import {
   runTransaction,
   serverTimestamp,
   where,
-  type FirebaseFirestoreTypes,
+  type Timestamp,
 } from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import type {
@@ -174,8 +174,8 @@ export async function submitPracticumFeedback(
     throw new Error('Pesan & kesan terlalu pendek (minimal 5 karakter).');
   }
 
-  if (cleanComment.length > 600) {
-    throw new Error('Pesan & kesan terlalu panjang (maksimal 600 karakter).');
+  if (cleanComment.length > 500) {
+    throw new Error('Pesan & kesan terlalu panjang (maksimal 500 karakter).');
   }
 
   let authUid: string | null = null;
@@ -185,7 +185,7 @@ export async function submitPracticumFeedback(
     authUid = null;
   }
 
-  const effectiveStudentId = authUid || studentId;
+  const effectiveStudentId = authUid;
 
   if (!effectiveStudentId?.trim()) {
     throw new Error(
@@ -224,10 +224,7 @@ export async function submitPracticumFeedback(
       );
     }
 
-    if (
-      enrolledStudents.length > 0 &&
-      !enrolledStudents.includes(effectiveStudentId)
-    ) {
+    if (!enrolledStudents.includes(effectiveStudentId)) {
       throw new Error(
         'Anda tidak terdaftar sebagai peserta praktikum pada sesi ini.',
       );
@@ -286,11 +283,11 @@ export function subscribeToScheduleFeedbacks(
         let createdAtStr = '';
         if (
           raw.createdAt &&
-          typeof (raw.createdAt as FirebaseFirestoreTypes.Timestamp).toDate ===
+          typeof (raw.createdAt as Timestamp).toDate ===
             'function'
         ) {
           createdAtStr = (
-            raw.createdAt as FirebaseFirestoreTypes.Timestamp
+            raw.createdAt as Timestamp
           )
             .toDate()
             .toLocaleString('id-ID');
@@ -344,11 +341,11 @@ export function subscribeToStudentFeedback(
       let createdAtStr = '';
       if (
         raw.createdAt &&
-        typeof (raw.createdAt as FirebaseFirestoreTypes.Timestamp).toDate ===
+        typeof (raw.createdAt as Timestamp).toDate ===
           'function'
       ) {
         createdAtStr = (
-          raw.createdAt as FirebaseFirestoreTypes.Timestamp
+          raw.createdAt as Timestamp
         )
           .toDate()
           .toLocaleString('id-ID');

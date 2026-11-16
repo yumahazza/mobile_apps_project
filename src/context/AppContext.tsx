@@ -101,6 +101,48 @@ export interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+// Jumlah percobaan untuk membaca profil yang baru dibuat.
+const PROFILE_MAX_ATTEMPTS = 5;
+const PROFILE_RETRY_DELAY_MS = 400;
+
+const wait = (milliseconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+async function loadUserProfileWithRetry(
+  uid: string,
+): Promise<User> {
+  let lastError: unknown;
+
+  for (
+    let attempt = 0;
+    attempt < PROFILE_MAX_ATTEMPTS;
+    attempt++
+  ) {
+    try {
+      return await getUserProfile(uid);
+    } catch (error) {
+      lastError = error;
+
+      // Retry hanya jika profil belum tersedia.
+      const message =
+        error instanceof Error ? error.message : '';
+
+      if (
+        !message.includes('Profil pengguna belum ditemukan') ||
+        attempt === PROFILE_MAX_ATTEMPTS - 1
+      ) {
+        throw error;
+      }
+
+      await wait(PROFILE_RETRY_DELAY_MS);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('Gagal memuat profil pengguna.');
+}
+
 function getCurrentTimestamp(): string {
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
@@ -132,6 +174,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   // User state
   const [activeUser, setActiveUser] = useState<User>(DEFAULT_USER);
+
+  // Token untuk mengabaikan hasil async dari sesi auth lama.
+  const authRequestIdRef = useRef(0);
 
   // Existing local demo data
   const [schedules, setSchedules] =
@@ -169,25 +214,42 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       async (firebaseUser) => {
         if (!isMounted) return;
 
+        const requestId = ++authRequestIdRef.current;
+
         setAuthError(null);
         setAuthLoading(true);
 
+        // Jangan pertahankan akses akun sebelumnya
+        // ketika Firebase sedang memuat akun yang berbeda.
+        setIsAuthenticated(false);
+        setActiveUser(DEFAULT_USER);
+
         if (!firebaseUser) {
-          setIsAuthenticated(false);
-          setActiveUser(DEFAULT_USER);
           setAuthLoading(false);
           return;
         }
 
         try {
-          const profile = await getUserProfile(firebaseUser.uid);
+          const profile = await loadUserProfileWithRetry(
+            firebaseUser.uid,
+          );
 
-          if (!isMounted) return;
+          if (
+            !isMounted ||
+            requestId !== authRequestIdRef.current
+          ) {
+            return;
+          }
 
           setActiveUser(profile);
           setIsAuthenticated(true);
         } catch (error) {
-          if (!isMounted) return;
+          if (
+            !isMounted ||
+            requestId !== authRequestIdRef.current
+          ) {
+            return;
+          }
 
           setActiveUser(DEFAULT_USER);
           setIsAuthenticated(false);
@@ -197,7 +259,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               : 'Gagal memuat profil pengguna.'
           );
         } finally {
-          if (isMounted) {
+          if (
+            isMounted &&
+            requestId === authRequestIdRef.current
+          ) {
             setAuthLoading(false);
           }
         }
@@ -206,6 +271,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     return () => {
       isMounted = false;
+      authRequestIdRef.current += 1;
       unsubscribe();
     };
   }, []);

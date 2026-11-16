@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -10,12 +11,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-
 import {
   registerWithEmail,
   signInWithEmail,
 } from '@/services/authService';
-
 import { useApp } from '@/context/AppContext';
 import { APP_COLORS } from '@/constants/theme';
 
@@ -37,9 +36,11 @@ export const AuthScreen: React.FC = () => {
   const isRegister = mode === 'register';
 
   const handleSubmit = async () => {
+    if (loading) return;
+
     setErrorMessage('');
 
-    const normalizedEmail = email.trim();
+    const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail || !password) {
       setErrorMessage('Email dan password wajib diisi.');
@@ -81,7 +82,8 @@ export const AuthScreen: React.FC = () => {
         await signInWithEmail(normalizedEmail, password);
       }
 
-      // AppContext akan mendeteksi perubahan auth dan memuat profil.
+      // AppContext akan mendeteksi perubahan Firebase Auth
+      // dan memuat profil pengguna dari Firestore.
     } catch (error) {
       const code =
         typeof error === 'object' &&
@@ -93,17 +95,11 @@ export const AuthScreen: React.FC = () => {
       const message =
         error instanceof Error ? error.message : '';
 
-      if (
-        code.includes('email-already-in-use')
-      ) {
+      if (code.includes('email-already-in-use')) {
         setErrorMessage('Email ini sudah terdaftar.');
-      } else if (
-        code.includes('invalid-email')
-      ) {
+      } else if (code.includes('invalid-email')) {
         setErrorMessage('Format email belum valid.');
-      } else if (
-        code.includes('weak-password')
-      ) {
+      } else if (code.includes('weak-password')) {
         setErrorMessage('Password terlalu lemah.');
       } else if (
         code.includes('invalid-credential') ||
@@ -111,13 +107,21 @@ export const AuthScreen: React.FC = () => {
         code.includes('user-not-found')
       ) {
         setErrorMessage('Email atau password salah.');
-      } else if (
-        code.includes('network-request-failed')
-      ) {
-        setErrorMessage('Koneksi internet bermasalah.');
+      } else if (code.includes('network-request-failed')) {
+        setErrorMessage(
+          'Koneksi internet bermasalah. Silakan coba lagi.',
+        );
+      } else if (code.includes('too-many-requests')) {
+        setErrorMessage(
+          'Terlalu banyak percobaan login. Coba lagi nanti.',
+        );
+      } else if (code.includes('operation-not-allowed')) {
+        setErrorMessage(
+          'Metode login email dan password belum diaktifkan.',
+        );
       } else {
         setErrorMessage(
-          message || 'Terjadi kesalahan. Silakan coba lagi.'
+          message || 'Terjadi kesalahan. Silakan coba lagi.',
         );
       }
     } finally {
@@ -126,6 +130,8 @@ export const AuthScreen: React.FC = () => {
   };
 
   const changeMode = () => {
+    if (loading) return;
+
     setMode(isRegister ? 'login' : 'register');
     setErrorMessage('');
     setConfirmPassword('');
@@ -181,7 +187,9 @@ export const AuthScreen: React.FC = () => {
                 editable={!loading}
               />
 
-              <Text style={styles.label}>Program studi (opsional)</Text>
+              <Text style={styles.label}>
+                Program studi (opsional)
+              </Text>
               <TextInput
                 style={styles.input}
                 value={department}
@@ -220,7 +228,9 @@ export const AuthScreen: React.FC = () => {
 
           {isRegister && (
             <>
-              <Text style={styles.label}>Konfirmasi password</Text>
+              <Text style={styles.label}>
+                Konfirmasi password
+              </Text>
               <TextInput
                 style={styles.input}
                 value={confirmPassword}
@@ -236,8 +246,7 @@ export const AuthScreen: React.FC = () => {
 
           {(errorMessage || authError) && (
             <Text style={styles.error}>
-              {errorMessage ||
-                'Gagal memuat profil. Periksa akun dan aturan Firestore.'}
+              {errorMessage || authError}
             </Text>
           )}
 

@@ -3,7 +3,10 @@
  * Koleksi Firestore: leave_requests
  * Document ID: ${scheduleId}_${studentId}
  */
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import type {
+  FieldValue,
+  Timestamp,
+} from '@react-native-firebase/firestore';
 
 export type LeaveRequestStatus = 'MENUNGGU' | 'DITERIMA' | 'DITOLAK';
 
@@ -46,8 +49,8 @@ export interface LeaveRequestFirestoreDoc {
   aiSummary?: string;
   status: LeaveRequestStatus;
   reviewedBy: string | null;
-  reviewedAt: FirebaseFirestoreTypes.FieldValue | FirebaseFirestoreTypes.Timestamp | null;
-  createdAt: FirebaseFirestoreTypes.FieldValue | FirebaseFirestoreTypes.Timestamp;
+  reviewedAt: FieldValue | Timestamp | null;
+  createdAt: FieldValue | Timestamp;
 }
 
 export interface LeaveRequestItem {
@@ -67,5 +70,5 @@ export interface LeaveRequestItem {
   reviewedBy: string | null;
   reviewedAt: string | null;
   createdAt: string;
-  rawCreatedAt?: FirebaseFirestoreTypes.Timestamp | null;
+  rawCreatedAt?: Timestamp | null;
 }

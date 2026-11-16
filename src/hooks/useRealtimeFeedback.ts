@@ -40,6 +40,7 @@ export function useScheduleFeedbacks(scheduleId?: string) {
         setError(null);
       },
       err => {
+        setFeedbacks([]);
         setError(err);
         setLoading(false);
       },
@@ -81,6 +82,7 @@ export function useStudentFeedback(scheduleId?: string, studentUid?: string) {
         setError(null);
       },
       err => {
+        setFeedback(null);
         setError(err);
         setLoading(false);
       },
