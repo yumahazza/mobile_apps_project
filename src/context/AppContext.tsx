@@ -10,9 +10,27 @@ import React, {
   useState,
   useMemo,
   useRef,
+  useEffect,
   ReactNode,
 } from 'react';
-import { User, DUMMY_USERS, DEFAULT_USER, UserRole } from '@/data/users';
+
+import {
+  getAuth,
+  onAuthStateChanged,
+} from '@react-native-firebase/auth';
+
+import {
+  getUserProfile,
+  signOut,
+} from '@/services/authService';
+
+import {
+  User,
+  DUMMY_USERS,
+  DEFAULT_USER,
+  UserRole,
+} from '@/data/users';
+
 import {
   Schedule,
   AttendanceRecord,
@@ -29,6 +47,12 @@ export interface AttendanceResult {
 }
 
 export interface AppContextType {
+  // Authentication
+  authLoading: boolean;
+  authError: string | null;
+  isAuthenticated: boolean;
+  logout: () => Promise<void>;
+
   // User & Role
   activeUser: User;
   users: User[];
@@ -45,18 +69,31 @@ export interface AppContextType {
   // Session Control
   openSession: (scheduleId: string) => void;
   closeSession: (scheduleId: string) => void;
-  updateSessionStatus: (scheduleId: string, status: SessionStatus) => void;
+  updateSessionStatus: (
+    scheduleId: string,
+    status: SessionStatus
+  ) => void;
 
   // Attendance
   attendanceLogs: AttendanceRecord[];
-  submitAttendance: (scheduleId: string, student?: User) => AttendanceResult;
-  hasStudentAttended: (scheduleId: string, studentId: string) => boolean;
+  submitAttendance: (
+    scheduleId: string,
+    student?: User
+  ) => AttendanceResult;
+  hasStudentAttended: (
+    scheduleId: string,
+    studentId: string
+  ) => boolean;
   getStudentAttendanceForSchedule: (
     scheduleId: string,
     studentId: string
   ) => AttendanceRecord | undefined;
-  getAttendanceForSchedule: (scheduleId: string) => AttendanceRecord[];
-  getStudentHistory: (studentId: string) => (AttendanceRecord & { schedule?: Schedule })[];
+  getAttendanceForSchedule: (
+    scheduleId: string
+  ) => AttendanceRecord[];
+  getStudentHistory: (
+    studentId: string
+  ) => (AttendanceRecord & { schedule?: Schedule })[];
 
   // Reset
   resetDemoData: () => void;
@@ -69,25 +106,40 @@ function getCurrentTimestamp(): string {
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const seconds = String(now.getSeconds()).padStart(2, '0');
+
   return `${hours}:${minutes}:${seconds} WIB`;
 }
 
 function getCurrentDate(): string {
   const now = new Date();
   const day = now.getDate();
+
   const months = [
     'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
     'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
   ];
+
   return `${day} ${months[now.getMonth()]} ${now.getFullYear()}`;
 }
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [activeUser, setActiveUser] = useState<User>(DEFAULT_USER);
-  const [schedules, setSchedules] = useState<Schedule[]>(DUMMY_SCHEDULES);
-  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>(DUMMY_ATTENDANCE_LOGS);
+export const AppProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  // Authentication state
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Kunci presensi agar pemanggilan berulang tidak membuat catatan ganda.
+  // User state
+  const [activeUser, setActiveUser] = useState<User>(DEFAULT_USER);
+
+  // Existing local demo data
+  const [schedules, setSchedules] =
+    useState<Schedule[]>(DUMMY_SCHEDULES);
+
+  const [attendanceLogs, setAttendanceLogs] =
+    useState<AttendanceRecord[]>(DUMMY_ATTENDANCE_LOGS);
+
   const attendanceKeysRef = useRef<Set<string>>(
     new Set(
       DUMMY_ATTENDANCE_LOGS.map(
@@ -95,39 +147,131 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       )
     )
   );
-  const [activeScheduleId, setActiveScheduleId] = useState<string>('sch-1');
+
+  const [activeScheduleId, setActiveScheduleId] =
+    useState<string>('sch-1');
 
   const activeRole: UserRole = activeUser.role;
 
   const activeSchedule = useMemo(
-    () => schedules.find((s) => s.id === activeScheduleId) || schedules[0],
+    () =>
+      schedules.find((schedule) => schedule.id === activeScheduleId) ||
+      schedules[0],
     [schedules, activeScheduleId]
   );
 
-  const switchUser = (userId: string) => {
-    const targetUser = DUMMY_USERS.find((u) => u.id === userId);
+  // Listen to Firebase Authentication changes
+  useEffect(() => {
+    let isMounted = true;
+
+    const unsubscribe = onAuthStateChanged(
+      getAuth(),
+      async (firebaseUser) => {
+        if (!isMounted) return;
+
+        setAuthError(null);
+        setAuthLoading(true);
+
+        if (!firebaseUser) {
+          setIsAuthenticated(false);
+          setActiveUser(DEFAULT_USER);
+          setAuthLoading(false);
+          return;
+        }
+
+        try {
+          const profile = await getUserProfile(firebaseUser.uid);
+
+          if (!isMounted) return;
+
+          setActiveUser(profile);
+          setIsAuthenticated(true);
+        } catch (error) {
+          if (!isMounted) return;
+
+          setActiveUser(DEFAULT_USER);
+          setIsAuthenticated(false);
+          setAuthError(
+            error instanceof Error
+              ? error.message
+              : 'Gagal memuat profil pengguna.'
+          );
+        } finally {
+          if (isMounted) {
+            setAuthLoading(false);
+          }
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Logout from Firebase
+  const logout = async (): Promise<void> => {
+    setAuthError(null);
+
+    try {
+      await signOut();
+      // onAuthStateChanged will update the authentication state.
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Gagal logout. Silakan coba lagi.';
+
+      setAuthError(message);
+      throw error;
+    }
+  };
+
+  // Demo role switching is available only when not authenticated.
+  const switchUser = (userId: string): void => {
+    if (isAuthenticated) return;
+
+    const targetUser = DUMMY_USERS.find(
+      (user) => user.id === userId
+    );
+
     if (targetUser) {
       setActiveUser(targetUser);
     }
   };
 
-  const updateSessionStatus = (scheduleId: string, status: SessionStatus) => {
-    setSchedules((prev) =>
-      prev.map((item) => (item.id === scheduleId ? { ...item, status } : item))
+  // Session control
+  const updateSessionStatus = (
+    scheduleId: string,
+    status: SessionStatus
+  ): void => {
+    setSchedules((previous) =>
+      previous.map((schedule) =>
+        schedule.id === scheduleId
+          ? { ...schedule, status }
+          : schedule
+      )
     );
   };
 
-  const openSession = (scheduleId: string) => {
+  const openSession = (scheduleId: string): void => {
     updateSessionStatus(scheduleId, 'DIBUKA');
   };
 
-  const closeSession = (scheduleId: string) => {
+  const closeSession = (scheduleId: string): void => {
     updateSessionStatus(scheduleId, 'SELESAI');
   };
 
-  const hasStudentAttended = (scheduleId: string, studentId: string): boolean => {
+  // Attendance helpers
+  const hasStudentAttended = (
+    scheduleId: string,
+    studentId: string
+  ): boolean => {
     return attendanceLogs.some(
-      (log) => log.scheduleId === scheduleId && log.studentId === studentId
+      (log) =>
+        log.scheduleId === scheduleId &&
+        log.studentId === studentId
     );
   };
 
@@ -136,33 +280,52 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     studentId: string
   ): AttendanceRecord | undefined => {
     return attendanceLogs.find(
-      (log) => log.scheduleId === scheduleId && log.studentId === studentId
+      (log) =>
+        log.scheduleId === scheduleId &&
+        log.studentId === studentId
     );
   };
 
-  const getAttendanceForSchedule = (scheduleId: string): AttendanceRecord[] => {
-    return attendanceLogs.filter((log) => log.scheduleId === scheduleId);
+  const getAttendanceForSchedule = (
+    scheduleId: string
+  ): AttendanceRecord[] => {
+    return attendanceLogs.filter(
+      (log) => log.scheduleId === scheduleId
+    );
   };
 
-  const getStudentHistory = (studentId: string) => {
-    const studentLogs = attendanceLogs.filter((log) => log.studentId === studentId);
+  const getStudentHistory = (
+    studentId: string
+  ): (AttendanceRecord & { schedule?: Schedule })[] => {
+    const studentLogs = attendanceLogs.filter(
+      (log) => log.studentId === studentId
+    );
+
     return studentLogs.map((log) => ({
       ...log,
-      schedule: schedules.find((s) => s.id === log.scheduleId),
+      schedule: schedules.find(
+        (schedule) => schedule.id === log.scheduleId
+      ),
     }));
   };
 
+  // Submit attendance (currently uses local demo state)
   const submitAttendance = (
     scheduleId: string,
     student: User = activeUser
   ): AttendanceResult => {
-    const targetSchedule = schedules.find((s) => s.id === scheduleId);
+    const targetSchedule = schedules.find(
+      (schedule) => schedule.id === scheduleId
+    );
 
     if (!targetSchedule) {
-      return { success: false, message: 'Jadwal praktikum tidak ditemukan.' };
+      return {
+        success: false,
+        message: 'Jadwal praktikum tidak ditemukan.',
+      };
     }
 
-    // SRS-VAL-001: Tombol presensi disabled jika belum dibuka atau selesai
+    // SRS-VAL-001: Validate session status
     if (targetSchedule.status === 'BELUM_DIBUKA') {
       return {
         success: false,
@@ -173,11 +336,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     if (targetSchedule.status === 'SELESAI') {
       return {
         success: false,
-        message: 'Sesi praktikum telah ditutup. Presensi tidak dapat dilakukan lagi.',
+        message:
+          'Sesi praktikum telah ditutup. Presensi tidak dapat dilakukan lagi.',
       };
     }
 
-    // SRS-VAL-002: Pencegahan presensi ganda
+    // SRS-VAL-002: Prevent duplicate attendance
     const attendanceKey = `${scheduleId}:${student.id}`;
 
     if (
@@ -186,16 +350,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     ) {
       return {
         success: false,
-        message: 'Anda sudah melakukan presensi pada sesi ini sebelumnya.',
+        message:
+          'Anda sudah melakukan presensi pada sesi ini sebelumnya.',
       };
     }
 
-    // Kunci langsung sebelum pembaruan state React selesai.
     attendanceKeysRef.current.add(attendanceKey);
 
-    // SRS-STU-002: Catat waktu presensi lokal (timestamp)
     const timestamp = getCurrentTimestamp();
     const date = getCurrentDate();
+
     const newRecord: AttendanceRecord = {
       id: `att-${Date.now()}-${student.id}`,
       scheduleId,
@@ -207,9 +371,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       status: 'Hadir',
     };
 
-    setAttendanceLogs((prev) => [newRecord, ...prev]);
+    setAttendanceLogs((previous) => [
+      newRecord,
+      ...previous,
+    ]);
 
-    // SRS-STU-003: Feedback sukses presensi beserta waktu kehadiran
     return {
       success: true,
       message: `Presensi Berhasil! Waktu: ${timestamp}`,
@@ -218,41 +384,63 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   };
 
-  const resetDemoData = () => {
-    setActiveUser(DEFAULT_USER);
+  // Reset local demo data
+  const resetDemoData = (): void => {
+    if (!isAuthenticated) {
+      setActiveUser(DEFAULT_USER);
+    }
+
     setSchedules(DUMMY_SCHEDULES);
     setAttendanceLogs(DUMMY_ATTENDANCE_LOGS);
+
     attendanceKeysRef.current = new Set(
       DUMMY_ATTENDANCE_LOGS.map(
         (log) => `${log.scheduleId}:${log.studentId}`
       )
     );
+
     setActiveScheduleId('sch-1');
   };
 
   return (
     <AppContext.Provider
       value={{
+        // Authentication
+        authLoading,
+        authError,
+        isAuthenticated,
+        logout,
+
+        // User & Role
         activeUser,
         users: DUMMY_USERS,
         activeRole,
         setActiveUser,
         switchUser,
+
+        // Schedules
         schedules,
         activeScheduleId,
         activeSchedule,
         setActiveScheduleId,
+
+        // Session Control
         openSession,
         closeSession,
         updateSessionStatus,
+
+        // Attendance
         attendanceLogs,
         submitAttendance,
         hasStudentAttended,
         getStudentAttendanceForSchedule,
         getAttendanceForSchedule,
         getStudentHistory,
+
+        // Reset
         resetDemoData,
-      }}>
+      }}
+    >
       {children}
     </AppContext.Provider>
   );
@@ -260,9 +448,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useApp = (): AppContextType => {
   const context = useContext(AppContext);
+
   if (!context) {
     throw new Error('useApp must be used within an AppProvider');
   }
+
   return context;
 };
 

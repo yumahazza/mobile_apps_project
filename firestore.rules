@@ -1,0 +1,142 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Memeriksa status login pengguna.
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Mengambil role pengguna yang sedang login.
+    function currentRole() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data.role;
+    }
+
+    function isAssistant() {
+      return signedIn() && currentRole() == 'assistant';
+    }
+
+    function isStudent() {
+      return signedIn() && currentRole() == 'student';
+    }
+
+    // ==========================================
+    // USERS: profil dan daftar praktikan
+    // ==========================================
+    match /users/{uid} {
+
+      // Pengguna dapat membaca profilnya sendiri.
+      // Asisten juga dapat membaca profil pengguna.
+      allow get: if signedIn()
+        && (
+          request.auth.uid == uid
+          || isAssistant()
+        );
+
+      // Hanya asisten yang boleh mengambil daftar praktikan.
+      allow list: if isAssistant();
+
+      // Registrasi publik hanya boleh membuat profil student.
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == 'student'
+        && request.resource.data.keys().hasAll([
+          'name',
+          'email',
+          'role',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'name',
+          'email',
+          'role',
+          'nim',
+          'department',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.email is string;
+
+      // Pengguna boleh memperbarui informasi profil tertentu,
+      // tetapi tidak boleh mengubah role-nya sendiri.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly([
+            'name',
+            'nim',
+            'department',
+            'updatedAt'
+          ]);
+
+      // Penghapusan profil tidak diizinkan melalui aplikasi.
+      allow delete: if false;
+    }
+
+    // ==========================================
+    // SCHEDULES: jadwal praktikum
+    // ==========================================
+    match /schedules/{scheduleId} {
+
+      // Asisten hanya membaca jadwal miliknya.
+      // Student hanya membaca jadwal yang diikutinya.
+      allow read: if (
+        isAssistant()
+        && resource.data.assistantId == request.auth.uid
+      ) || (
+        isStudent()
+        && request.auth.uid in resource.data.enrolledStudents
+      );
+
+      // Hanya asisten yang boleh membuat jadwal untuk dirinya.
+      allow create: if isAssistant()
+        && request.resource.data.assistantId == request.auth.uid
+        && request.resource.data.status == 'BELUM_DIBUKA'
+        && request.resource.data.enrolledStudents is list
+        && request.resource.data.totalStudents
+          == request.resource.data.enrolledStudents.size();
+
+      // Asisten hanya boleh mengubah jadwal miliknya
+      // dan hanya pada field yang ditentukan.
+      allow update: if isAssistant()
+        && resource.data.assistantId == request.auth.uid
+        && request.resource.data.assistantId
+          == resource.data.assistantId
+        && request.resource.data.diff(resource.data)
+          .affectedKeys().hasOnly([
+            'courseName',
+            'className',
+            'room',
+            'date',
+            'time',
+            'enrolledStudents',
+            'totalStudents',
+            'status',
+            'updatedAt'
+          ])
+        && request.resource.data.enrolledStudents is list
+        && request.resource.data.totalStudents
+          == request.resource.data.enrolledStudents.size()
+        && request.resource.data.status in [
+          'BELUM_DIBUKA',
+          'DIBUKA',
+          'SELESAI'
+        ];
+
+      // Jadwal yang sedang dibuka tidak boleh dihapus.
+      allow delete: if isAssistant()
+        && resource.data.assistantId == request.auth.uid
+        && resource.data.status != 'DIBUKA';
+    }
+
+    // Koleksi lain tetap ditolak sampai aturan
+    // aksesnya disepakati dan ditambahkan oleh tim.
+  }
+}
