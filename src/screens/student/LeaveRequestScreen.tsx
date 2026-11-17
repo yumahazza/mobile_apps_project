@@ -47,13 +47,12 @@ interface LeaveRequestScreenProps {
 export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
   navigation,
 }) => {
-  const { activeUser, activeScheduleId, schedules: contextSchedules } = useApp();
-  const { schedules: firestoreSchedules, loading: schedulesLoading } = useFirestoreSchedules(
-    activeUser.id,
-    'student',
-  );
-  const schedules =
-    firestoreSchedules.length > 0 ? firestoreSchedules : contextSchedules;
+  const { activeUser, activeScheduleId } = useApp();
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+  } = useFirestoreSchedules(activeUser.id, 'student');
   const {
     leaveRequests,
     loading: leavesLoading,
@@ -132,6 +131,10 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
               <ActivityIndicator size="small" color={APP_COLORS.primary} />
               <Text style={styles.loadingText}>Memuat jadwal praktikum...</Text>
             </View>
+          </Card>
+        ) : schedulesError ? (
+          <Card style={styles.card}>
+            <Text style={styles.loadingText}>{schedulesError}</Text>
           </Card>
         ) : schedules.length === 0 ? (
           <Card style={styles.card}>

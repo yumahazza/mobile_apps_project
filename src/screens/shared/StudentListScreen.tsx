@@ -6,11 +6,13 @@ import {
   ScrollView,
   Pressable,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
 import { ParticipantRoster } from '@/components/ParticipantRoster';
 import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -34,7 +36,6 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
   const {
     activeUser,
     activeScheduleId,
-    getAttendanceForSchedule,
     activeRole,
   } = useApp();
   const { schedules, loading: schedulesLoading, error: schedulesError } =
@@ -45,9 +46,14 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
   const currentSchedule =
     schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
 
-  const attendanceLogs = useMemo(() => {
-    return currentSchedule ? getAttendanceForSchedule(currentSchedule.id) : [];
-  }, [currentSchedule, getAttendanceForSchedule]);
+  const {
+    attendances: attendanceLogs,
+    loading: attendancesLoading,
+    error: attendancesError,
+  } = useRealtimeAttendance(
+    currentSchedule?.id,
+    currentSchedule?.totalStudents ?? 0,
+  );
 
   const filteredLogs = useMemo(() => {
     if (!searchQuery.trim()) return attendanceLogs;
@@ -121,7 +127,14 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
         </View>
 
         {/* Students Table or Empty State */}
-        {filteredLogs.length === 0 ? (
+        {attendancesError ? (
+          <Text style={styles.errorMessage}>{attendancesError}</Text>
+        ) : attendancesLoading ? (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            <Text style={styles.loadingRowText}>Memuat presensi dari Firestore...</Text>
+          </View>
+        ) : filteredLogs.length === 0 ? (
           <EmptyState
             icon="people-outline"
             title={
@@ -329,6 +342,16 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.75,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: APP_SPACING.sm,
+    marginBottom: 12,
+  },
+  loadingRowText: {
+    color: APP_COLORS.textSecondary,
+    fontSize: 12,
   },
   loadingMessage: {
     color: APP_COLORS.textSecondary,

@@ -310,10 +310,16 @@ service cloud.firestore {
 
       allow get: if signedIn() && (
         (
-          isStudent()
-          && resource.data.studentId == request.auth.uid
+          resource != null
+          && (
+            (
+              isStudent()
+              && resource.data.studentId == request.auth.uid
+            )
+            || ownsSchedule(resource.data.scheduleId)
+          )
         )
-        || ownsSchedule(resource.data.scheduleId)
+        || missingOwnStudentDocument(feedbackId)
       );
 
       allow list: if ownsSchedule(resource.data.scheduleId);
