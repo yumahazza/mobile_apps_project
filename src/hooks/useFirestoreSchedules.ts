@@ -16,32 +16,44 @@ interface ScheduleState {
  * Listener is removed automatically when UID/role changes or screen unmounts.
  */
 export function useFirestoreSchedules(uid: string, role: ScheduleRole): ScheduleState {
-  const [state, setState] = useState<ScheduleState>({
+  const requestKey = uid ? `${uid}:${role}` : '';
+  const [state, setState] = useState<{
+    key: string;
+    schedules: PracticumSchedule[];
+    error: string | null;
+  }>({
+    key: '',
     schedules: [],
-    loading: true,
     error: null,
   });
 
   useEffect(() => {
-    setState({ schedules: [], loading: true, error: null });
     if (!uid) {
-      setState({
-        schedules: [],
-        loading: false,
-        error: 'UID pengguna belum tersedia. Silakan login kembali.',
-      });
       return undefined;
     }
 
+    const activeKey = `${uid}:${role}`;
     const unsubscribe = subscribeToPracticumSchedules(
       uid,
       role,
-      schedules => setState({ schedules, loading: false, error: null }),
-      message => setState(prev => ({ ...prev, loading: false, error: message })),
+      schedules => setState({ key: activeKey, schedules, error: null }),
+      message => setState({ key: activeKey, schedules: [], error: message }),
     );
 
     return unsubscribe;
   }, [uid, role]);
 
-  return state;
+  if (!uid) {
+    return {
+      schedules: [],
+      loading: false,
+      error: 'UID pengguna belum tersedia. Silakan login kembali.',
+    };
+  }
+
+  return {
+    schedules: state.key === requestKey ? state.schedules : [],
+    loading: state.key !== requestKey,
+    error: state.key === requestKey ? state.error : null,
+  };
 }

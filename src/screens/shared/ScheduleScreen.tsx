@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -63,21 +63,20 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     [schedules],
   );
 
-  useEffect(() => {
-    if (!modalVisible || !isAssistant) return;
-    let mounted = true;
+  const loadStudents = () => {
+    if (!isAssistant) return;
     setLoadingStudents(true);
     getStudentDirectory()
-      .then(list => { if (mounted) setStudents(list); })
+      .then(list => setStudents(list))
       .catch(err => Alert.alert('Gagal memuat praktikan', err.message || 'Periksa koneksi dan izin Firestore.'))
-      .finally(() => { if (mounted) setLoadingStudents(false); });
-    return () => { mounted = false; };
-  }, [modalVisible, isAssistant]);
+      .finally(() => setLoadingStudents(false));
+  };
 
   const openCreate = () => {
     setEditingSchedule(null);
     setForm(emptyForm());
     setModalVisible(true);
+    loadStudents();
   };
 
   const openEdit = (schedule: PracticumSchedule) => {
@@ -91,6 +90,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
       enrolledStudents: [...schedule.enrolledStudents],
     });
     setModalVisible(true);
+    loadStudents();
   };
 
   const updateField = (field: keyof ScheduleInput, value: string) => {

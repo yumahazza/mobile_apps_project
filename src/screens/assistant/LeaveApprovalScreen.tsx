@@ -273,48 +273,57 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
                     </Text>
                   ) : null}
 
-                  {/* Tombol Keputusan Terima / Tolak */}
-                  <View style={styles.decisionRow}>
-                    <View style={styles.decisionBtnCol}>
-                      <CustomButton
-                        title="Tolak"
-                        variant={item.status === 'DITOLAK' ? 'danger' : 'outline'}
-                        size="md"
-                        disabled={isProcessing || item.status === 'DITOLAK'}
-                        leftIcon={
-                          <Ionicons
-                            name="close-circle-outline"
-                            size={16}
-                            color={
-                              item.status === 'DITOLAK'
-                                ? APP_COLORS.white
-                                : APP_COLORS.danger
-                            }
-                          />
-                        }
-                        onPress={() => handlePromptDecision(item, 'DITOLAK')}
-                      />
-                    </View>
-                    <View style={styles.decisionBtnCol}>
-                      <CustomButton
-                        title="Terima"
-                        variant="primary"
-                        size="md"
-                        loading={isProcessing}
-                        disabled={isProcessing || item.status === 'DITERIMA'}
-                        leftIcon={
-                          !isProcessing ? (
+                  {/* Tombol Keputusan Terima / Tolak (hanya saat MENUNGGU) */}
+                  {item.status === 'MENUNGGU' ? (
+                    <View style={styles.decisionRow}>
+                      <View style={styles.decisionBtnCol}>
+                        <CustomButton
+                          title="Tolak"
+                          variant="outline"
+                          size="md"
+                          disabled={isProcessing}
+                          leftIcon={
                             <Ionicons
-                              name="checkmark-circle-outline"
+                              name="close-circle-outline"
                               size={16}
-                              color={APP_COLORS.white}
+                              color={APP_COLORS.danger}
                             />
-                          ) : undefined
-                        }
-                        onPress={() => handlePromptDecision(item, 'DITERIMA')}
-                      />
+                          }
+                          onPress={() => handlePromptDecision(item, 'DITOLAK')}
+                        />
+                      </View>
+                      <View style={styles.decisionBtnCol}>
+                        <CustomButton
+                          title="Terima"
+                          variant="primary"
+                          size="md"
+                          loading={isProcessing}
+                          disabled={isProcessing}
+                          leftIcon={
+                            !isProcessing ? (
+                              <Ionicons
+                                name="checkmark-circle-outline"
+                                size={16}
+                                color={APP_COLORS.white}
+                              />
+                            ) : undefined
+                          }
+                          onPress={() => handlePromptDecision(item, 'DITERIMA')}
+                        />
+                      </View>
                     </View>
-                  </View>
+                  ) : (
+                    <View style={styles.decisionLockedBox}>
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={14}
+                        color={APP_COLORS.textSecondary}
+                      />
+                      <Text style={styles.decisionLockedText}>
+                        Keputusan izin sudah final ({item.status}) dan tidak dapat diubah.
+                      </Text>
+                    </View>
+                  )}
                 </Card>
               );
             })}
@@ -562,6 +571,23 @@ const styles = StyleSheet.create({
   },
   decisionBtnCol: {
     flex: 1,
+  },
+  decisionLockedBox: {
+    marginTop: APP_SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  decisionLockedText: {
+    flex: 1,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
   },
 });
 

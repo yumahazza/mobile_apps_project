@@ -17,81 +17,96 @@ import {
  * Hook untuk Asisten: Mengambil daftar feedback & hasil sentimen pada sesi tertentu.
  */
 export function useScheduleFeedbacks(scheduleId?: string) {
-  const [feedbacks, setFeedbacks] = useState<FeedbackRecordItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const activeKey = scheduleId?.trim() || '';
+  const [state, setState] = useState<{
+    key: string;
+    feedbacks: FeedbackRecordItem[];
+    error: string | null;
+  }>({
+    key: '',
+    feedbacks: [],
+    error: null,
+  });
 
   useEffect(() => {
-    if (!scheduleId?.trim()) {
-      setFeedbacks([]);
-      setLoading(false);
-      setError(null);
+    if (!activeKey) {
       return undefined;
     }
 
-    setLoading(true);
-    setError(null);
-
+    const targetKey = activeKey;
     const unsubscribe = subscribeToScheduleFeedbacks(
-      scheduleId,
+      targetKey,
       items => {
-        setFeedbacks(items);
-        setLoading(false);
-        setError(null);
+        setState({ key: targetKey, feedbacks: items, error: null });
       },
       err => {
-        setFeedbacks([]);
-        setError(err);
-        setLoading(false);
+        setState({ key: targetKey, feedbacks: [], error: err });
       },
     );
 
     return () => {
       unsubscribe();
     };
-  }, [scheduleId]);
+  }, [activeKey]);
 
-  return { feedbacks, loading, error };
+  if (!activeKey) {
+    return { feedbacks: [], loading: false, error: null };
+  }
+
+  return {
+    feedbacks: state.key === activeKey ? state.feedbacks : [],
+    loading: state.key !== activeKey,
+    error: state.key === activeKey ? state.error : null,
+  };
 }
 
 /**
  * Hook untuk Praktikan: Memeriksa apakah praktikan sudah mengirim feedback pada sesi ini.
  */
 export function useStudentFeedback(scheduleId?: string, studentUid?: string) {
-  const [feedback, setFeedback] = useState<FeedbackRecordItem | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const cleanScheduleId = scheduleId?.trim() || '';
+  const cleanStudentUid = studentUid?.trim() || '';
+  const activeKey =
+    cleanScheduleId && cleanStudentUid ? `${cleanScheduleId}_${cleanStudentUid}` : '';
+  const [state, setState] = useState<{
+    key: string;
+    feedback: FeedbackRecordItem | null;
+    error: string | null;
+  }>({
+    key: '',
+    feedback: null,
+    error: null,
+  });
 
   useEffect(() => {
-    if (!scheduleId?.trim() || !studentUid?.trim()) {
-      setFeedback(null);
-      setLoading(false);
-      setError(null);
+    if (!activeKey) {
       return undefined;
     }
 
-    setLoading(true);
-    setError(null);
-
+    const targetKey = activeKey;
     const unsubscribe = subscribeToStudentFeedback(
-      scheduleId,
-      studentUid,
+      cleanScheduleId,
+      cleanStudentUid,
       item => {
-        setFeedback(item);
-        setLoading(false);
-        setError(null);
+        setState({ key: targetKey, feedback: item, error: null });
       },
       err => {
-        setFeedback(null);
-        setError(err);
-        setLoading(false);
+        setState({ key: targetKey, feedback: null, error: err });
       },
     );
 
     return () => {
       unsubscribe();
     };
-  }, [scheduleId, studentUid]);
+  }, [activeKey, cleanScheduleId, cleanStudentUid]);
 
-  return { feedback, loading, error };
+  if (!activeKey) {
+    return { feedback: null, loading: false, error: null };
+  }
+
+  return {
+    feedback: state.key === activeKey ? state.feedback : null,
+    loading: state.key !== activeKey,
+    error: state.key === activeKey ? state.error : null,
+  };
 }
