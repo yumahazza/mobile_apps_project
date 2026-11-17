@@ -14,6 +14,8 @@ import React, {
   ReactNode,
 } from 'react';
 
+import { Platform } from 'react-native';
+
 import {
   getAuth,
   onAuthStateChanged,
@@ -50,6 +52,7 @@ export interface AppContextType {
   // Authentication
   authLoading: boolean;
   authError: string | null;
+  firebaseUnavailable: boolean;
   isAuthenticated: boolean;
   logout: () => Promise<void>;
 
@@ -170,6 +173,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   // Authentication state
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [firebaseUnavailable, setFirebaseUnavailable] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   // User state
@@ -208,71 +212,120 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   // Listen to Firebase Authentication changes
   useEffect(() => {
     let isMounted = true;
+    let unsubscribe: (() => void) | undefined;
 
-    const unsubscribe = onAuthStateChanged(
-      getAuth(),
-      async (firebaseUser) => {
-        if (!isMounted) return;
+    const initAuthListener = async () => {
+      // Hindari pemanggilan sinkron setState langsung di body useEffect.
+      await Promise.resolve();
+      if (!isMounted) return;
 
-        const requestId = ++authRequestIdRef.current;
-
-        setAuthError(null);
-        setAuthLoading(true);
-
-        // Jangan pertahankan akses akun sebelumnya
-        // ketika Firebase sedang memuat akun yang berbeda.
-        setIsAuthenticated(false);
+      if (Platform.OS === 'web') {
         setActiveUser(DEFAULT_USER);
+        setIsAuthenticated(false);
+        setFirebaseUnavailable(true);
+        setAuthError(
+          'Mode Web tidak mendukung Firebase native (@react-native-firebase) dan listener real-time Firestore.'
+        );
+        setAuthLoading(false);
+        return;
+      }
 
-        if (!firebaseUser) {
-          setAuthLoading(false);
+      try {
+        const auth = getAuth();
+        const authUnsubscribe = onAuthStateChanged(
+          auth,
+          async (firebaseUser) => {
+            if (!isMounted) return;
+
+            const requestId = ++authRequestIdRef.current;
+
+            setAuthError(null);
+            setFirebaseUnavailable(false);
+            setAuthLoading(true);
+
+            // Jangan pertahankan akses akun sebelumnya
+            // ketika Firebase sedang memuat akun yang berbeda.
+            setIsAuthenticated(false);
+            setActiveUser(DEFAULT_USER);
+
+            if (!firebaseUser) {
+              setAuthLoading(false);
+              return;
+            }
+
+            try {
+              const profile = await loadUserProfileWithRetry(
+                firebaseUser.uid,
+              );
+
+              if (
+                !isMounted ||
+                requestId !== authRequestIdRef.current
+              ) {
+                return;
+              }
+
+              setActiveUser(profile);
+              setIsAuthenticated(true);
+            } catch (error) {
+              if (
+                !isMounted ||
+                requestId !== authRequestIdRef.current
+              ) {
+                return;
+              }
+
+              setActiveUser(DEFAULT_USER);
+              setIsAuthenticated(false);
+              setAuthError(
+                error instanceof Error
+                  ? error.message
+                  : 'Gagal memuat profil pengguna.'
+              );
+            } finally {
+              if (
+                isMounted &&
+                requestId === authRequestIdRef.current
+              ) {
+                setAuthLoading(false);
+              }
+            }
+          }
+        );
+
+        if (!isMounted) {
+          authUnsubscribe();
           return;
         }
+        unsubscribe = authUnsubscribe;
+      } catch (error) {
+        if (!isMounted) return;
 
-        try {
-          const profile = await loadUserProfileWithRetry(
-            firebaseUser.uid,
-          );
+        const message =
+          error instanceof Error ? error.message : '';
+        const isMissingNativeApp =
+          message.includes("No Firebase App '[DEFAULT]'") ||
+          message.includes('RNFBAppModule') ||
+          message.includes('not installed');
 
-          if (
-            !isMounted ||
-            requestId !== authRequestIdRef.current
-          ) {
-            return;
-          }
-
-          setActiveUser(profile);
-          setIsAuthenticated(true);
-        } catch (error) {
-          if (
-            !isMounted ||
-            requestId !== authRequestIdRef.current
-          ) {
-            return;
-          }
-
-          setActiveUser(DEFAULT_USER);
-          setIsAuthenticated(false);
-          setAuthError(
-            error instanceof Error
-              ? error.message
-              : 'Gagal memuat profil pengguna.'
-          );
-        } finally {
-          if (
-            isMounted &&
-            requestId === authRequestIdRef.current
-          ) {
-            setAuthLoading(false);
-          }
-        }
+        setActiveUser(DEFAULT_USER);
+        setIsAuthenticated(false);
+        setFirebaseUnavailable(true);
+        setAuthError(
+          isMissingNativeApp
+            ? 'Modul native Firebase belum aktif (Expo Go tidak mendukung @react-native-firebase).'
+            : message || 'Gagal menginisialisasi Firebase Authentication.'
+        );
+        setAuthLoading(false);
       }
-    );
+    };
+
+    void initAuthListener();
 
     return () => {
       isMounted = false;
       authRequestIdRef.current += 1;
-      unsubscribe();
+      unsubscribe?.();
     };
   }, []);
 
@@ -474,6 +527,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         // Authentication
         authLoading,
         authError,
+        firebaseUnavailable,
         isAuthenticated,
         logout,
 

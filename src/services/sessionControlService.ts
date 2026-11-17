@@ -8,16 +8,18 @@
  */
 import {
   doc,
-  getFirestore,
   onSnapshot,
   runTransaction,
   serverTimestamp,
 } from '@react-native-firebase/firestore';
-import { getAuth } from '@react-native-firebase/auth';
+import {
+  getFirestoreDb,
+  getSafeAuthUid,
+  getSafeFirestoreDb,
+} from '@/services/firebaseClient';
 import type { SessionStatus } from '@/data/schedules';
 import type { PracticumSchedule } from '@/services/practicumScheduleService';
 
-const db = getFirestore();
 const SCHEDULES_COLLECTION = 'schedules';
 
 export interface SessionControlResult {
@@ -32,12 +34,7 @@ export interface SessionControlResult {
  * Jika belum login ke Firebase Auth, mengembalikan null.
  */
 export function getActiveAuthUid(): string | null {
-  try {
-    const authInstance = getAuth();
-    return authInstance.currentUser?.uid ?? null;
-  } catch {
-    return null;
-  }
+  return getSafeAuthUid();
 }
 
 /**
@@ -85,6 +82,7 @@ export async function changePracticumSessionStatus(
     );
   }
 
+  const db = getFirestoreDb();
   const scheduleDocRef = doc(db, SCHEDULES_COLLECTION, scheduleId);
 
   return runTransaction(db, async transaction => {
@@ -150,6 +148,13 @@ export function subscribeToSingleSchedule(
 ): () => void {
   if (!scheduleId?.trim()) {
     onData(null);
+    return () => undefined;
+  }
+
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData(null);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
     return () => undefined;
   }
 

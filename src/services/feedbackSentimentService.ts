@@ -15,7 +15,6 @@
 import {
   collection,
   doc,
-  getFirestore,
   onSnapshot,
   query,
   runTransaction,
@@ -23,14 +22,17 @@ import {
   where,
   type Timestamp,
 } from '@react-native-firebase/firestore';
-import { getAuth } from '@react-native-firebase/auth';
+import {
+  getFirestoreDb,
+  getSafeAuthUid,
+  getSafeFirestoreDb,
+} from '@/services/firebaseClient';
 import type {
   FeedbackRecordItem,
   SentimentLabel,
 } from '@/types/attendance';
 import { isDummyStudentId } from '@/services/attendanceService';
 
-const db = getFirestore();
 const FEEDBACKS_COLLECTION = 'feedbacks';
 const SCHEDULES_COLLECTION = 'schedules';
 
@@ -178,14 +180,7 @@ export async function submitPracticumFeedback(
     throw new Error('Pesan & kesan terlalu panjang (maksimal 500 karakter).');
   }
 
-  let authUid: string | null = null;
-  try {
-    authUid = getAuth().currentUser?.uid ?? null;
-  } catch {
-    authUid = null;
-  }
-
-  const effectiveStudentId = authUid;
+  const effectiveStudentId = getSafeAuthUid();
 
   if (!effectiveStudentId?.trim()) {
     throw new Error(
@@ -201,6 +196,7 @@ export async function submitPracticumFeedback(
 
   // Lakukan klasifikasi AI sebelum penulisan database
   const aiResult = await analyzeFeedbackSentiment(cleanComment);
+  const db = getFirestoreDb();
   const feedbackDocId = `${scheduleId}_${effectiveStudentId}`;
   const feedbackDocRef = doc(db, FEEDBACKS_COLLECTION, feedbackDocId);
   const scheduleDocRef = doc(db, SCHEDULES_COLLECTION, scheduleId);
@@ -270,6 +266,13 @@ export function subscribeToScheduleFeedbacks(
     return () => undefined;
   }
 
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData([]);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
+    return () => undefined;
+  }
+
   const feedbacksQuery = query(
     collection(db, FEEDBACKS_COLLECTION),
     where('scheduleId', '==', scheduleId),
@@ -323,6 +326,13 @@ export function subscribeToStudentFeedback(
 ): () => void {
   if (!scheduleId?.trim() || !studentId?.trim()) {
     onData(null);
+    return () => undefined;
+  }
+
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData(null);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
     return () => undefined;
   }
 
