@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
-import { updatePracticumSessionStatus } from '@/services/practicumScheduleService';
+import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
+import { subscribeToScheduleAttendances } from '@/services/attendanceService';
+import {
+  openPracticumSession,
+  closePracticumSession,
+} from '@/services/sessionControlService';
 import { Card } from '@/components/Card';
 import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
@@ -44,7 +49,6 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     activeUser,
     activeScheduleId,
     setActiveScheduleId,
-    getAttendanceForSchedule,
   } = useApp();
   const { schedules, loading: schedulesLoading, error: schedulesError } =
     useFirestoreSchedules(activeUser.id, 'assistant');
@@ -67,6 +71,38 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     message: '',
   });
 
+  const [hadirCountsBySchedule, setHadirCountsBySchedule] = useState<
+    Record<string, number>
+  >({});
+
+  const scheduleIdsKey = schedules.map((schedule) => schedule.id).join('|');
+
+  useEffect(() => {
+    if (!scheduleIdsKey) {
+      return undefined;
+    }
+
+    const scheduleIds = scheduleIdsKey.split('|').filter(Boolean);
+    const unsubscribes = scheduleIds.map((scheduleId) =>
+      subscribeToScheduleAttendances(
+        scheduleId,
+        (records) => {
+          const hadir = records.filter((item) => item.status === 'Hadir').length;
+          setHadirCountsBySchedule((prev) =>
+            prev[scheduleId] === hadir ? prev : { ...prev, [scheduleId]: hadir },
+          );
+        },
+        () => {
+          // Abaikan error per jadwal agar ringkasan jadwal lain tetap tampil.
+        },
+      ),
+    );
+
+    return () => {
+      unsubscribes.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [scheduleIdsKey]);
+
   const showNotification = (message: string, type: 'success' | 'info' = 'success') => {
     setNotification({ visible: true, type, message });
     setTimeout(() => {
@@ -75,9 +111,10 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
   };
 
   const currentSchedule = activeSchedule || schedules[0];
-  const attendanceList = currentSchedule
-    ? getAttendanceForSchedule(currentSchedule.id)
-    : [];
+  const { stats } = useRealtimeAttendance(
+    currentSchedule?.id,
+    currentSchedule?.totalStudents ?? 0,
+  );
 
   const targetScheduleForModal =
     schedules.find((s) => s.id === confirmModal.scheduleId) || currentSchedule;
@@ -102,10 +139,11 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     const { action, scheduleId } = confirmModal;
     const target = schedules.find(schedule => schedule.id === scheduleId) || currentSchedule;
     try {
-      await updatePracticumSessionStatus(
-        scheduleId,
-        action === 'open' ? 'DIBUKA' : 'SELESAI',
-      );
+      if (action === 'open') {
+        await openPracticumSession(scheduleId, activeUser.id);
+      } else {
+        await closePracticumSession(scheduleId, activeUser.id);
+      }
       showNotification(
         `Sesi "${target?.courseName} - ${target?.className}" berhasil ${
           action === 'open' ? 'DIBUKA' : 'DITUTUP'
@@ -122,18 +160,16 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
     }
   };
 
-  const attendancePercent = currentSchedule && currentSchedule.totalStudents > 0
-    ? Math.round((attendanceList.length / currentSchedule.totalStudents) * 100)
-    : 0;
+  const attendancePercent = currentSchedule ? stats.attendancePercentage : 0;
   const totalAttendance = schedules.reduce(
-    (total, schedule) => total + getAttendanceForSchedule(schedule.id).length,
-    0
+    (total, schedule) => total + (hadirCountsBySchedule[schedule.id] ?? 0),
+    0,
   );
   const openSessions = schedules.filter((schedule) => schedule.status === 'DIBUKA').length;
-  const totalRegistered = currentSchedule?.totalStudents || 0;
-  const hadirCount = attendanceList.length;
-  const izinCount = 0;
-  const alfaCount = Math.max(0, totalRegistered - hadirCount);
+  const totalRegistered = currentSchedule ? stats.totalRegistered : 0;
+  const hadirCount = currentSchedule ? stats.hadirCount : 0;
+  const izinCount = currentSchedule ? stats.izinCount : 0;
+  const alfaCount = currentSchedule ? stats.alfaCount : 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -278,40 +314,42 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
                 {currentSchedule.time} | {currentSchedule.room} • {attendancePercent}% Hadir
               </Text>
             </View>
-            <Pressable
-              onPress={() => {
-                if (currentSchedule.status === 'DIBUKA') {
-                  handleCloseSessionModal(currentSchedule.id);
-                } else {
-                  handleOpenSessionModal(currentSchedule.id);
-                }
-              }}
-              style={({ pressed }) => [
-                styles.quickToggleBtn,
-                currentSchedule.status === 'DIBUKA'
-                  ? styles.quickToggleClose
-                  : styles.quickToggleOpen,
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons
-                name={currentSchedule.status === 'DIBUKA' ? 'pause' : 'play'}
-                size={14}
-                color={
+            {currentSchedule.status !== 'SELESAI' && (
+              <Pressable
+                onPress={() => {
+                  if (currentSchedule.status === 'DIBUKA') {
+                    handleCloseSessionModal(currentSchedule.id);
+                  } else {
+                    handleOpenSessionModal(currentSchedule.id);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.quickToggleBtn,
                   currentSchedule.status === 'DIBUKA'
-                    ? APP_COLORS.danger
-                    : APP_COLORS.primary
-                }
-              />
-              <Text
-                style={[
-                  styles.quickToggleText,
-                  currentSchedule.status === 'DIBUKA'
-                    ? styles.quickToggleTextDanger
-                    : styles.quickToggleTextPrimary,
+                    ? styles.quickToggleClose
+                    : styles.quickToggleOpen,
+                  pressed && styles.pressed,
                 ]}>
-                {currentSchedule.status === 'DIBUKA' ? 'Tutup' : 'Buka'}
-              </Text>
-            </Pressable>
+                <Ionicons
+                  name={currentSchedule.status === 'DIBUKA' ? 'pause' : 'play'}
+                  size={14}
+                  color={
+                    currentSchedule.status === 'DIBUKA'
+                      ? APP_COLORS.danger
+                      : APP_COLORS.primary
+                  }
+                />
+                <Text
+                  style={[
+                    styles.quickToggleText,
+                    currentSchedule.status === 'DIBUKA'
+                      ? styles.quickToggleTextDanger
+                      : styles.quickToggleTextPrimary,
+                  ]}>
+                  {currentSchedule.status === 'DIBUKA' ? 'Tutup' : 'Buka'}
+                </Text>
+              </Pressable>
+            )}
           </Card>
         )}
 
@@ -320,7 +358,10 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
           {/* Rekap */}
           <Pressable
             onPress={() =>
-              navigation.navigate('SessionRecap', { scheduleId: currentSchedule.id })
+              navigation.navigate(
+                'SessionRecap',
+                currentSchedule ? { scheduleId: currentSchedule.id } : undefined,
+              )
             }
             style={({ pressed }) => [styles.actionTile, pressed && styles.pressed]}>
             <View style={styles.actionIconBox}>
@@ -342,7 +383,10 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
           {/* Presensi / Kontrol Sesi */}
           <Pressable
             onPress={() =>
-              navigation.navigate('SessionControl', { scheduleId: currentSchedule.id })
+              navigation.navigate(
+                'SessionControl',
+                currentSchedule ? { scheduleId: currentSchedule.id } : undefined,
+              )
             }
             style={({ pressed }) => [styles.actionTile, pressed && styles.pressed]}>
             <View style={styles.actionIconBox}>
@@ -354,7 +398,10 @@ export const AssistantHomeScreen: React.FC<AssistantHomeScreenProps> = ({
           {/* Mahasiswa */}
           <Pressable
             onPress={() =>
-              navigation.navigate('StudentList', { scheduleId: currentSchedule.id })
+              navigation.navigate(
+                'StudentList',
+                currentSchedule ? { scheduleId: currentSchedule.id } : undefined,
+              )
             }
             style={({ pressed }) => [styles.actionTile, pressed && styles.pressed]}>
             <View style={styles.actionIconBox}>

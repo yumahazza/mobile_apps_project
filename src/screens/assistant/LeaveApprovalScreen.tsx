@@ -47,13 +47,12 @@ interface LeaveApprovalScreenProps {
 export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   navigation,
 }) => {
-  const { activeUser, activeScheduleId, schedules: contextSchedules } = useApp();
-  const { schedules: firestoreSchedules, loading: schedulesLoading } = useFirestoreSchedules(
-    activeUser.id,
-    'assistant',
-  );
-  const schedules =
-    firestoreSchedules.length > 0 ? firestoreSchedules : contextSchedules;
+  const { activeUser, activeScheduleId } = useApp();
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+  } = useFirestoreSchedules(activeUser.id, 'assistant');
 
   const initialScheduleId =
     navigation.params?.scheduleId || activeScheduleId || schedules[0]?.id || '';
@@ -145,6 +144,10 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
               <ActivityIndicator size="small" color={APP_COLORS.primary} />
               <Text style={styles.loadingText}>Memuat jadwal asisten...</Text>
             </View>
+          </Card>
+        ) : schedulesError ? (
+          <Card style={styles.card}>
+            <Text style={styles.loadingText}>{schedulesError}</Text>
           </Card>
         ) : schedules.length === 0 ? (
           <Card style={styles.card}>
