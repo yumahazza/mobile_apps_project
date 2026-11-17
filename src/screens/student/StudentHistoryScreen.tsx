@@ -68,6 +68,26 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
     return Array.from(set);
   }, [enrichedLogs]);
 
+  const hadirCount = useMemo(
+    () => enrichedLogs.filter((log) => log.status === 'Hadir').length,
+    [enrichedLogs],
+  );
+
+  const izinCount = useMemo(
+    () => enrichedLogs.filter((log) => log.status === 'Izin').length,
+    [enrichedLogs],
+  );
+
+  const activeOrFinishedSchedulesCount = useMemo(
+    () => schedules.filter((schedule) => schedule.status !== 'BELUM_DIBUKA').length,
+    [schedules],
+  );
+
+  const attendancePercentage =
+    activeOrFinishedSchedulesCount > 0
+      ? Math.min(100, Math.round((hadirCount / activeOrFinishedSchedulesCount) * 100))
+      : 0;
+
   const filteredLogs = useMemo(() => {
     return enrichedLogs.filter((log) => {
       const courseName = (log.schedule?.courseName || '').toLowerCase();
@@ -118,20 +138,16 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
           {/* Metrics Tiles dari data riwayat Firestore */}
           <View style={styles.metricsGrid}>
             <View style={styles.metricTile}>
-              <Text style={styles.metricVal}>{enrichedLogs.length}</Text>
+              <Text style={styles.metricVal}>{hadirCount}</Text>
               <Text style={styles.metricLabel}>Total Hadir</Text>
             </View>
             <View style={styles.metricTile}>
-              <Text style={styles.metricVal}>
-                {schedules.length > 0
-                  ? `${Math.round((enrichedLogs.length / schedules.length) * 100)}%`
-                  : '100%'}
-              </Text>
-              <Text style={styles.metricLabel}>Kehadiran</Text>
+              <Text style={styles.metricVal}>{izinCount}</Text>
+              <Text style={styles.metricLabel}>Total Izin</Text>
             </View>
             <View style={styles.metricTile}>
-              <Text style={styles.metricVal}>Aktif</Text>
-              <Text style={styles.metricLabel}>Status</Text>
+              <Text style={styles.metricVal}>{attendancePercentage}%</Text>
+              <Text style={styles.metricLabel}>Kehadiran</Text>
             </View>
           </View>
         </Card>
@@ -227,36 +243,39 @@ export const StudentHistoryScreen: React.FC<StudentHistoryScreenProps> = ({
           />
         ) : (
           <View style={styles.historyList}>
-            {filteredLogs.map((log) => (
-              <Card
-                key={log.id}
-                onPress={() =>
-                  navigation.navigate('AttendanceDetail', {
-                    record: log,
-                    schedule: log.schedule,
-                  })
-                }
-                style={styles.historyCard}>
-                <View style={styles.historyRow}>
-                  <View style={styles.iconBox}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={APP_COLORS.opened}
-                    />
+            {filteredLogs.map((log) => {
+              const isExcused = log.status === 'Izin';
+              return (
+                <Card
+                  key={log.id}
+                  onPress={() =>
+                    navigation.navigate('AttendanceDetail', {
+                      record: log,
+                      schedule: log.schedule,
+                    })
+                  }
+                  style={styles.historyCard}>
+                  <View style={styles.historyRow}>
+                    <View style={styles.iconBox}>
+                      <Ionicons
+                        name={isExcused ? 'document-text' : 'checkmark-circle'}
+                        size={20}
+                        color={isExcused ? APP_COLORS.warning : APP_COLORS.opened}
+                      />
+                    </View>
+                    <View style={styles.historyTextCol}>
+                      <Text style={styles.courseTitle}>
+                        {log.schedule?.courseName || 'Praktikum'}
+                      </Text>
+                      <Text style={styles.historyMeta}>
+                        {log.date} • {log.timestamp}
+                      </Text>
+                    </View>
+                    <StatusBadge status={log.status} size="sm" />
                   </View>
-                  <View style={styles.historyTextCol}>
-                    <Text style={styles.courseTitle}>
-                      {log.schedule?.courseName || 'Praktikum'}
-                    </Text>
-                    <Text style={styles.historyMeta}>
-                      {log.date} • {log.timestamp}
-                    </Text>
-                  </View>
-                  <StatusBadge status={log.status} size="sm" />
-                </View>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </View>
         )}
       </ScrollView>
