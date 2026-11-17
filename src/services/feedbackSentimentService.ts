@@ -15,10 +15,11 @@
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   query,
-  runTransaction,
   serverTimestamp,
+  setDoc,
   where,
   type Timestamp,
 } from '@react-native-firebase/firestore';
@@ -201,41 +202,50 @@ export async function submitPracticumFeedback(
   const feedbackDocRef = doc(db, FEEDBACKS_COLLECTION, feedbackDocId);
   const scheduleDocRef = doc(db, SCHEDULES_COLLECTION, scheduleId);
 
-  await runTransaction(db, async transaction => {
-    // 1. Validasi sesi di Firestore
-    const scheduleSnap = await transaction.get(scheduleDocRef);
-    if (!scheduleSnap.exists()) {
-      throw new Error('Sesi praktikum tidak ditemukan.');
-    }
+  // 1. Validasi sesi di Firestore (tanpa runTransaction agar tidak memicu retry loop / deadline-exceeded)
+  const scheduleSnap = await getDoc(scheduleDocRef);
+  if (!scheduleSnap.exists()) {
+    throw new Error('Sesi praktikum tidak ditemukan.');
+  }
 
-    const scheduleData = scheduleSnap.data() as Record<string, unknown>;
-    const status = String(scheduleData.status ?? 'BELUM_DIBUKA');
-    const enrolledStudents = Array.isArray(scheduleData.enrolledStudents)
-      ? scheduleData.enrolledStudents
-      : [];
+  const scheduleData = scheduleSnap.data() as Record<string, unknown>;
+  const status = String(scheduleData.status ?? 'BELUM_DIBUKA');
+  const enrolledStudents = Array.isArray(scheduleData.enrolledStudents)
+    ? scheduleData.enrolledStudents
+    : [];
 
-    if (status !== 'SELESAI') {
-      throw new Error(
-        'Pesan & kesan hanya dapat diberikan setelah sesi praktikum dinyatakan SELESAI oleh asisten.',
-      );
-    }
+  if (status !== 'SELESAI') {
+    throw new Error(
+      'Pesan & kesan hanya dapat diberikan setelah sesi praktikum dinyatakan SELESAI oleh asisten.',
+    );
+  }
 
-    if (!enrolledStudents.includes(effectiveStudentId)) {
-      throw new Error(
-        'Anda tidak terdaftar sebagai peserta praktikum pada sesi ini.',
-      );
-    }
+  if (!enrolledStudents.includes(effectiveStudentId)) {
+    throw new Error(
+      'Anda tidak terdaftar sebagai peserta praktikum pada sesi ini.',
+    );
+  }
 
-    // 2. Pencegahan feedback ganda
-    const existingFeedbackSnap = await transaction.get(feedbackDocRef);
+  // 2. Pencegahan feedback ganda (aman bila rules menolak get pada dokumen yang belum ada)
+  let alreadyExists = false;
+  try {
+    const existingFeedbackSnap = await getDoc(feedbackDocRef);
     if (existingFeedbackSnap.exists()) {
-      throw new Error(
-        'Anda sudah mengirimkan pesan & kesan untuk sesi praktikum ini.',
-      );
+      alreadyExists = true;
     }
+  } catch {
+    // Abaikan error baca pada dokumen yang belum ada; setDoc di bawah tetap dijaga allow create / allow update: false.
+  }
 
-    // 3. Simpan dokumen feedback
-    transaction.set(feedbackDocRef, {
+  if (alreadyExists) {
+    throw new Error(
+      'Anda sudah mengirimkan pesan & kesan untuk sesi praktikum ini.',
+    );
+  }
+
+  // 3. Simpan dokumen feedback secara langsung
+  try {
+    await setDoc(feedbackDocRef, {
       scheduleId,
       studentId: effectiveStudentId,
       studentName: studentName.trim() || 'Praktikan',
@@ -243,7 +253,18 @@ export async function submitPracticumFeedback(
       sentiment: aiResult.sentiment,
       createdAt: serverTimestamp(),
     });
-  });
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : '';
+    if (
+      errMsg.includes('permission-denied') ||
+      errMsg.includes('PERMISSION_DENIED')
+    ) {
+      throw new Error(
+        'Anda sudah mengirimkan pesan & kesan untuk sesi praktikum ini.',
+      );
+    }
+    throw err;
+  }
 
   return {
     success: true,

@@ -1,14 +1,13 @@
 /**
- * Fritz — LeaveApprovalScreen (Sprint 2)
+ * LeaveApprovalScreen (Sprint 2)
  *
- * Halaman Pemeriksaan & Keputusan Izin untuk Asisten Praktikum (Kebutuhan #11):
+ * Halaman Pemeriksaan & Keputusan Izin Manual oleh Asisten Praktikum:
  * - Menampilkan daftar pengajuan izin praktikan secara real-time (onSnapshot)
- * - Menampilkan nama praktikan, NIM, sesi, alasan izin, serta badge hasil klasifikasi AI
- * - Menyediakan tombol Terima ('DITERIMA') dan Tolak ('DITOLAK')
+ * - Review dilakukan 100% secara manual oleh Asisten Praktikum (Terima / Tolak)
  * - Menyimpan keputusan ke Firestore secara real-time dan menyinkronkan status 'Izin'
  *   ke koleksi `attendances` jika disetujui.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -24,11 +23,8 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useScheduleLeaveRequests } from '@/hooks/useRealtimeLeaveRequests';
 import { reviewLeaveRequest } from '@/services/leaveRequestService';
-import type { LeaveRequestItem } from '@/types/leaveRequest';
-import { Card } from '@/components/Card';
-import { CustomButton } from '@/components/CustomButton';
+import type { LeaveRequestItem, LeaveRequestStatus } from '@/types/leaveRequest';
 import { StatusBadge } from '@/components/StatusBadge';
-import { LeaveClassificationBadge } from '@/components/LeaveClassificationBadge';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
@@ -36,13 +32,14 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
-  APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
 
 interface LeaveApprovalScreenProps {
   navigation: NavigationProp;
 }
+
+type FilterStatus = 'ALL' | LeaveRequestStatus;
 
 export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   navigation,
@@ -59,9 +56,10 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>(
     initialScheduleId,
   );
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
 
   const currentSchedule =
-    schedules.find(s => s.id === selectedScheduleId) || schedules[0];
+    schedules.find((s) => s.id === selectedScheduleId) || schedules[0];
 
   const {
     leaveRequests,
@@ -69,6 +67,7 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
     approvedCount,
     rejectedCount,
     loading: leavesLoading,
+    error: leavesError,
   } = useScheduleLeaveRequests(currentSchedule?.id);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -81,6 +80,11 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
     item: null,
     decision: 'DITERIMA',
   });
+
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === 'ALL') return leaveRequests;
+    return leaveRequests.filter((item) => item.status === statusFilter);
+  }, [leaveRequests, statusFilter]);
 
   const handlePromptDecision = (
     item: LeaveRequestItem,
@@ -128,7 +132,8 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
-        title="Pemeriksaan Izin"
+        title="Review Izin Praktikan"
+        subtitle="Keputusan manual oleh Asisten Praktikum"
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -139,28 +144,26 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
         {/* Pemilih Sesi Praktikum */}
         <Text style={styles.sectionTitle}>Pilih Sesi Praktikum</Text>
         {schedulesLoading ? (
-          <Card style={styles.card}>
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={APP_COLORS.primary} />
-              <Text style={styles.loadingText}>Memuat jadwal asisten...</Text>
-            </View>
-          </Card>
+          <View style={styles.stateCard}>
+            <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            <Text style={styles.loadingText}>Memuat jadwal asisten...</Text>
+          </View>
         ) : schedulesError ? (
-          <Card style={styles.card}>
+          <View style={styles.stateCard}>
             <Text style={styles.loadingText}>{schedulesError}</Text>
-          </Card>
+          </View>
         ) : schedules.length === 0 ? (
-          <Card style={styles.card}>
+          <View style={styles.stateCard}>
             <Text style={styles.loadingText}>
               Belum ada jadwal praktikum yang ditugaskan untuk akun asisten ini.
             </Text>
-          </Card>
+          </View>
         ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.scheduleTabsRow}>
-            {schedules.map(item => {
+            {schedules.map((item) => {
               const isSelected = item.id === currentSchedule?.id;
               return (
                 <Pressable
@@ -190,51 +193,125 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
           </ScrollView>
         )}
 
-        {/* Ringkasan Statistik Pengajuan Izin Sesi */}
+        {/* Bento Summary Cards untuk Status Izin (Reference UI image 4) */}
         <View style={styles.statsRow}>
-          <View style={[styles.statBox, styles.statBoxPending]}>
+          <Pressable
+            onPress={() => setStatusFilter('MENUNGGU')}
+            style={[styles.statBox, styles.statBoxPending]}>
             <Text style={styles.statValue}>{pendingCount}</Text>
-            <Text style={styles.statLabel}>Menunggu</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxApproved]}>
+            <Text style={styles.statLabel}>Menunggu Review</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setStatusFilter('DITERIMA')}
+            style={[styles.statBox, styles.statBoxApproved]}>
             <Text style={styles.statValue}>{approvedCount}</Text>
             <Text style={styles.statLabel}>Diterima</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxRejected]}>
+          </Pressable>
+          <Pressable
+            onPress={() => setStatusFilter('DITOLAK')}
+            style={[styles.statBox, styles.statBoxRejected]}>
             <Text style={styles.statValue}>{rejectedCount}</Text>
             <Text style={styles.statLabel}>Ditolak</Text>
-          </View>
+          </Pressable>
         </View>
+
+        {/* Filter Status Pills (Reference UI image 4) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterPillsRow}>
+          {[
+            {
+              key: 'ALL' as FilterStatus,
+              label: 'Semua',
+              count: leaveRequests.length,
+              color: '#C7D2FE',
+            },
+            {
+              key: 'MENUNGGU' as FilterStatus,
+              label: 'Menunggu',
+              count: pendingCount,
+              color: '#FDE68A',
+            },
+            {
+              key: 'DITERIMA' as FilterStatus,
+              label: 'Diterima',
+              count: approvedCount,
+              color: '#86EFAC',
+            },
+            {
+              key: 'DITOLAK' as FilterStatus,
+              label: 'Ditolak',
+              count: rejectedCount,
+              color: '#FECACA',
+            },
+          ].map((pill) => {
+            const active = statusFilter === pill.key;
+            return (
+              <Pressable
+                key={pill.key}
+                onPress={() => setStatusFilter(pill.key)}
+                style={[styles.filterPill, active && styles.filterPillActive]}>
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    active && styles.filterPillTextActive,
+                  ]}>
+                  {pill.label}
+                </Text>
+                <View
+                  style={[
+                    styles.filterCountBadge,
+                    { backgroundColor: active ? pill.color : '#E2E8F0' },
+                  ]}>
+                  <Text style={styles.filterCountText}>{pill.count}</Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
 
         {/* Daftar Pengajuan Izin */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>Daftar Pengajuan Izin Mahasiswa</Text>
+          <Text style={styles.sectionTitle}>Daftar Pengajuan Izin</Text>
           {leavesLoading && (
             <ActivityIndicator size="small" color={APP_COLORS.primary} />
           )}
         </View>
 
-        {leaveRequests.length === 0 ? (
-          <Card style={styles.emptyCard}>
+        {leavesError ? (
+          <View style={styles.stateCard}>
+            <Text style={styles.loadingText}>{leavesError}</Text>
+          </View>
+        ) : filteredRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
             <EmptyState
               icon="document-text-outline"
               title="Belum Ada Pengajuan Izin"
-              description="Pengajuan izin dari praktikan pada sesi ini beserta klasifikasi AI akan muncul secara real-time di sini."
+              description="Pengajuan izin dari praktikan pada sesi ini akan muncul secara real-time di sini untuk direview secara manual oleh asisten."
             />
-          </Card>
+          </View>
         ) : (
           <View style={styles.listContainer}>
-            {leaveRequests.map(item => {
+            {filteredRequests.map((item) => {
               const isProcessing = processingId === item.id;
               const sessionTitle =
                 item.courseName || currentSchedule?.courseName || 'Praktikum';
               const sessionClass =
                 item.className || currentSchedule?.className || '';
+              const studentInitial = (item.studentName || 'M')
+                .charAt(0)
+                .toUpperCase();
 
               return (
-                <Card key={item.id} style={styles.itemCard}>
+                <View key={item.id} style={styles.itemCard}>
                   {/* Baris Atas: Identitas Praktikan & Status */}
                   <View style={styles.itemHeaderRow}>
+                    <View style={styles.studentAvatar}>
+                      <Text style={styles.studentAvatarText}>
+                        {studentInitial}
+                      </Text>
+                    </View>
                     <View style={styles.studentInfoCol}>
                       <Text style={styles.studentName}>{item.studentName}</Text>
                       <Text style={styles.studentMeta}>
@@ -248,83 +325,86 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
                     <StatusBadge status={item.status} size="sm" />
                   </View>
 
-                  {/* Klasifikasi AI Badge & Ringkasan */}
-                  <View style={styles.aiSection}>
-                    <LeaveClassificationBadge
-                      classification={item.aiClassification}
-                      aiStatus={item.aiStatus}
-                      urgency={item.aiUrgency}
-                      size="md"
-                    />
-                    <Text style={styles.aiSummaryText}>{item.aiSummary}</Text>
-                  </View>
-
                   {/* Alasan Ketidakhadiran */}
                   <View style={styles.reasonBox}>
-                    <Text style={styles.reasonLabel}>Alasan Praktikan:</Text>
-                    <Text style={styles.reasonText}>&quot;{item.reason}&quot;</Text>
+                    <Text style={styles.reasonLabel}>
+                      Alasan Pengajuan Izin Praktikan:
+                    </Text>
+                    <Text style={styles.reasonText}>
+                      &quot;{item.reason}&quot;
+                    </Text>
                   </View>
 
                   {/* Info Reviewer jika sudah diproses */}
                   {item.reviewedBy ? (
-                    <Text style={styles.reviewedByText}>
-                      Diputuskan oleh: {item.reviewedBy}{' '}
-                      {item.reviewedAt ? `• ${item.reviewedAt}` : ''}
-                    </Text>
+                    <View style={styles.reviewedByPill}>
+                      <Ionicons
+                        name="checkmark-done-circle"
+                        size={15}
+                        color="#0F172A"
+                      />
+                      <Text style={styles.reviewedByText}>
+                        Direview oleh Asisten: {item.reviewedBy}{' '}
+                        {item.reviewedAt ? `• ${item.reviewedAt}` : ''}
+                      </Text>
+                    </View>
                   ) : null}
 
-                  {/* Tombol Keputusan Terima / Tolak (hanya saat MENUNGGU) */}
+                  {/* Tombol Keputusan Manual Terima / Tolak (hanya saat MENUNGGU) */}
                   {item.status === 'MENUNGGU' ? (
                     <View style={styles.decisionRow}>
-                      <View style={styles.decisionBtnCol}>
-                        <CustomButton
-                          title="Tolak"
-                          variant="outline"
-                          size="md"
-                          disabled={isProcessing}
-                          leftIcon={
+                      <Pressable
+                        disabled={isProcessing}
+                        onPress={() => handlePromptDecision(item, 'DITOLAK')}
+                        style={({ pressed }) => [
+                          styles.rejectPillBtn,
+                          pressed && styles.pressed,
+                        ]}>
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={17}
+                          color="#DC2626"
+                        />
+                        <Text style={styles.rejectPillBtnText}>Tolak Izin</Text>
+                      </Pressable>
+
+                      <Pressable
+                        disabled={isProcessing}
+                        onPress={() => handlePromptDecision(item, 'DITERIMA')}
+                        style={({ pressed }) => [
+                          styles.approvePillBtn,
+                          pressed && styles.pressed,
+                        ]}>
+                        {isProcessing ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
                             <Ionicons
-                              name="close-circle-outline"
-                              size={16}
-                              color={APP_COLORS.danger}
+                              name="checkmark-circle-outline"
+                              size={17}
+                              color="#FFFFFF"
                             />
-                          }
-                          onPress={() => handlePromptDecision(item, 'DITOLAK')}
-                        />
-                      </View>
-                      <View style={styles.decisionBtnCol}>
-                        <CustomButton
-                          title="Terima"
-                          variant="primary"
-                          size="md"
-                          loading={isProcessing}
-                          disabled={isProcessing}
-                          leftIcon={
-                            !isProcessing ? (
-                              <Ionicons
-                                name="checkmark-circle-outline"
-                                size={16}
-                                color={APP_COLORS.white}
-                              />
-                            ) : undefined
-                          }
-                          onPress={() => handlePromptDecision(item, 'DITERIMA')}
-                        />
-                      </View>
+                            <Text style={styles.approvePillBtnText}>
+                              Terima Izin
+                            </Text>
+                          </>
+                        )}
+                      </Pressable>
                     </View>
                   ) : (
-                    <View style={styles.decisionLockedBox}>
+                    <View style={styles.lockedDecisionNotice}>
                       <Ionicons
                         name="lock-closed-outline"
                         size={14}
-                        color={APP_COLORS.textSecondary}
+                        color="#64748B"
                       />
-                      <Text style={styles.decisionLockedText}>
-                        Keputusan izin sudah final ({item.status}) dan tidak dapat diubah.
+                      <Text style={styles.lockedDecisionText}>
+                        Keputusan final telah disimpan ({item.status}) dan
+                        dikunci di Cloud Firestore.
                       </Text>
                     </View>
                   )}
-                </Card>
+                </View>
               );
             })}
           </View>
@@ -341,8 +421,8 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
         }
         subtitle={
           confirmDecision.decision === 'DITERIMA'
-            ? `Pengajuan izin dari ${confirmDecision.item?.studentName || 'praktikan'} akan disetujui (DITERIMA) dan status kehadiran otomatis tercatat sebagai Izin pada rekap presensi.`
-            : `Pengajuan izin dari ${confirmDecision.item?.studentName || 'praktikan'} akan ditolak (DITOLAK).`
+            ? `Status izin "${confirmDecision.item?.studentName}" akan disimpan sebagai DITERIMA dan otomatis tercatat sebagai "Izin" pada rekap presensi.`
+            : `Status izin "${confirmDecision.item?.studentName}" akan disimpan sebagai DITOLAK di Cloud Firestore.`
         }
         details={{
           courseName:
@@ -363,14 +443,18 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
         }
         onConfirm={handleConfirmDecision}
         onCancel={() =>
-          setConfirmDecision({ visible: false, item: null, decision: 'DITERIMA' })
+          setConfirmDecision({
+            visible: false,
+            item: null,
+            decision: 'DITERIMA',
+          })
         }
       />
 
       <BottomNavigation
         role="assistant"
         activeTab="AssistantHome"
-        onTabChange={tabKey => navigation.navigate(tabKey)}
+        onTabChange={(tabKey) => navigation.navigate(tabKey)}
       />
     </SafeAreaView>
   );
@@ -379,215 +463,299 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: APP_COLORS.background,
+    backgroundColor: '#F5F6FA',
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.sm,
+    paddingBottom: APP_SPACING.xxl,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: APP_SPACING.sm,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 10,
   },
-  card: {
-    padding: APP_SPACING.md,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.md,
-  },
-  loadingRow: {
+  stateCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: APP_SPACING.sm,
+    gap: 10,
+    padding: 16,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+    marginBottom: 14,
   },
   loadingText: {
     fontSize: 13,
-    color: APP_COLORS.textSecondary,
+    fontWeight: '600',
+    color: '#475569',
+    flex: 1,
   },
   scheduleTabsRow: {
-    gap: APP_SPACING.sm,
-    paddingBottom: APP_SPACING.md,
+    flexDirection: 'row',
+    gap: 10,
+    paddingBottom: 16,
   },
   scheduleChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-    minWidth: 160,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+    minWidth: 165,
   },
   scheduleChipActive: {
-    backgroundColor: APP_COLORS.primary,
-    borderColor: APP_COLORS.primary,
+    backgroundColor: '#0F172A',
   },
   scheduleChipTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   scheduleChipTitleActive: {
-    color: APP_COLORS.white,
+    color: '#FFFFFF',
   },
   scheduleChipSub: {
     fontSize: 11,
-    color: APP_COLORS.textSecondary,
-    marginTop: 2,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 3,
   },
   scheduleChipSubActive: {
-    color: '#DBEAFE',
+    color: '#CBD5E1',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: APP_SPACING.sm,
-    marginBottom: APP_SPACING.lg,
+    gap: 10,
+    marginBottom: 14,
   },
   statBox: {
     flex: 1,
-    paddingVertical: APP_SPACING.sm,
-    paddingHorizontal: APP_SPACING.sm,
-    borderRadius: 12,
-    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
   },
   statBoxPending: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
+    backgroundColor: '#FDE68A',
   },
   statBoxApproved: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#BBF7D0',
+    backgroundColor: '#86EFAC',
   },
   statBoxRejected: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
+    backgroundColor: '#FECACA',
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F172A',
   },
   statLabel: {
     fontSize: 11,
-    fontWeight: '600',
-    color: APP_COLORS.textSecondary,
+    fontWeight: '700',
+    color: '#1E293B',
     marginTop: 2,
+    textAlign: 'center',
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: 16,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingLeft: 14,
+    paddingRight: 8,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+  },
+  filterPillActive: {
+    backgroundColor: '#0F172A',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+  },
+  filterCountBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterCountText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: APP_SPACING.sm,
+    marginBottom: 10,
   },
   emptyCard: {
-    padding: APP_SPACING.sm,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+    padding: 20,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
   },
   listContainer: {
-    gap: APP_SPACING.md,
+    gap: 14,
   },
   itemCard: {
-    padding: APP_SPACING.md,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+    padding: 16,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
   },
   itemHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: APP_SPACING.sm,
+    marginBottom: 12,
+  },
+  studentAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#C7D2FE',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  studentAvatarText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   studentInfoCol: {
     flex: 1,
+    marginRight: 8,
   },
   studentName: {
     fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    fontWeight: '800',
+    color: '#0F172A',
   },
   studentMeta: {
     fontSize: 12,
-    color: APP_COLORS.textSecondary,
+    fontWeight: '600',
+    color: '#475569',
     marginTop: 2,
   },
   timestampText: {
     fontSize: 11,
-    color: APP_COLORS.textMuted,
+    color: '#64748B',
     marginTop: 2,
   },
-  aiSection: {
-    marginTop: APP_SPACING.sm,
-    padding: APP_SPACING.sm,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-    gap: 4,
-  },
-  aiSummaryText: {
-    fontSize: 11,
-    color: APP_COLORS.textSecondary,
-    lineHeight: 16,
-  },
   reasonBox: {
-    marginTop: APP_SPACING.sm,
-    padding: APP_SPACING.sm,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: '#FEF3C7',
+    borderColor: '#E2E8F0',
+    marginBottom: 12,
   },
   reasonLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#92400E',
-    marginBottom: 2,
+    color: '#475569',
+    marginBottom: 4,
   },
   reasonText: {
     fontSize: 13,
-    color: APP_COLORS.navyHeading,
+    fontWeight: '600',
+    color: '#0F172A',
+    lineHeight: 19,
     fontStyle: 'italic',
-    lineHeight: 18,
   },
-  reviewedByText: {
-    marginTop: APP_SPACING.xs,
-    fontSize: 11,
-    color: APP_COLORS.textSecondary,
-  },
-  decisionRow: {
-    marginTop: APP_SPACING.md,
-    flexDirection: 'row',
-    gap: APP_SPACING.sm,
-  },
-  decisionBtnCol: {
-    flex: 1,
-  },
-  decisionLockedBox: {
-    marginTop: APP_SPACING.md,
+  reviewedByPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+    marginBottom: 10,
   },
-  decisionLockedText: {
+  reviewedByText: {
+    fontSize: 11,
+    color: '#334155',
+    fontWeight: '700',
+  },
+  decisionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  rejectPillBtn: {
     flex: 1,
-    fontSize: 12,
-    color: APP_COLORS.textSecondary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 46,
+    borderRadius: 999,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#DC2626',
+  },
+  rejectPillBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#DC2626',
+  },
+  approvePillBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 46,
+    borderRadius: 999,
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: '#0F172A',
+  },
+  approvePillBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  lockedDecisionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+  },
+  lockedDecisionText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#475569',
+    lineHeight: 16,
+  },
+  pressed: {
+    opacity: 0.78,
   },
 });
 

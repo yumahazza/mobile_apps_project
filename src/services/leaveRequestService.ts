@@ -296,9 +296,7 @@ export async function submitLeaveRequest(
       return {
         success: true,
         message:
-          aiResult.aiStatus === 'SUCCESS'
-            ? `Pengajuan izin berhasil dikirim (Klasifikasi AI: ${aiResult.aiClassification}) dan sedang menunggu persetujuan asisten.`
-            : 'Pengajuan izin berhasil dikirim (AI perlu cek manual) dan sedang menunggu persetujuan asisten.',
+          'Pengajuan izin berhasil dikirim dan sedang menunggu review manual oleh Asisten Praktikum.',
         leaveRequestId: leaveDocId,
         aiClassification: aiResult.aiClassification,
         aiStatus: aiResult.aiStatus,
@@ -345,9 +343,7 @@ export async function submitLeaveRequest(
   return {
     success: true,
     message:
-      aiResult.aiStatus === 'SUCCESS'
-        ? `Pengajuan izin berhasil dikirim (Klasifikasi AI: ${aiResult.aiClassification}) dan sedang menunggu persetujuan asisten.`
-        : 'Pengajuan izin berhasil dikirim (AI perlu cek manual) dan sedang menunggu persetujuan asisten.',
+      'Pengajuan izin berhasil dikirim dan sedang menunggu review manual oleh Asisten Praktikum.',
     leaveRequestId: leaveDocId,
     aiClassification: aiResult.aiClassification,
     aiStatus: aiResult.aiStatus,

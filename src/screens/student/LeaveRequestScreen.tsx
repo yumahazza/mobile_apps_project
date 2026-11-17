@@ -29,7 +29,6 @@ import {
 import { Card } from '@/components/Card';
 import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
-import { LeaveClassificationBadge } from '@/components/LeaveClassificationBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
@@ -231,9 +230,9 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                 <Text style={styles.charCounter}>{reason.trim().length}/500 karakter</Text>
 
                 <View style={styles.aiInfoBox}>
-                  <Ionicons name="bulb-outline" size={16} color={APP_COLORS.primary} />
+                  <Ionicons name="person-circle-outline" size={18} color={APP_COLORS.primary} />
                   <Text style={styles.aiInfoText}>
-                    Sistem AI akan mengklasifikasikan kategori alasan izin secara otomatis untuk membantu pemeriksaan asisten. Keputusan diterima/ditolak tetap 100% ditentukan oleh Asisten Praktikum.
+                    Pengajuan izin akan berstatus MENUNGGU dan direview secara manual oleh Asisten Praktikum untuk disetujui (Diterima) atau ditolak.
                   </Text>
                 </View>
 
@@ -301,21 +300,13 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                     <Text style={styles.leaveReasonText}>&quot;{item.reason}&quot;</Text>
                   </View>
 
-                  <View style={styles.leaveBadgesRow}>
-                    <LeaveClassificationBadge
-                      classification={item.aiClassification}
-                      aiStatus={item.aiStatus}
-                      urgency={item.aiUrgency}
-                      size="sm"
-                    />
-                  </View>
-
-                  {item.reviewedBy ? (
-                    <Text style={styles.reviewerText}>
-                      Diperiksa oleh: {item.reviewedBy}{' '}
-                      {item.reviewedAt ? `(${item.reviewedAt})` : ''}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.reviewerText}>
+                    {item.reviewedBy
+                      ? `Direview secara manual oleh Asisten: ${item.reviewedBy}${
+                          item.reviewedAt ? ` (${item.reviewedAt})` : ''
+                        }`
+                      : 'Menunggu review manual dari Asisten Praktikum'}
+                  </Text>
                 </Card>
               );
             })}

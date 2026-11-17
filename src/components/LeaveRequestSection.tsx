@@ -22,7 +22,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { Card } from '@/components/Card';
 import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
-import { LeaveClassificationBadge } from '@/components/LeaveClassificationBadge';
 import { useStudentLeaveForSchedule } from '@/hooks/useRealtimeLeaveRequests';
 import {
   submitLeaveRequest,
@@ -146,15 +145,6 @@ export const LeaveRequestSection: React.FC<LeaveRequestSectionProps> = ({
           <Text style={styles.reasonValue}>&quot;{leaveRequest.reason}&quot;</Text>
         </View>
 
-        <View style={styles.badgeRow}>
-          <LeaveClassificationBadge
-            classification={leaveRequest.aiClassification}
-            aiStatus={leaveRequest.aiStatus}
-            urgency={leaveRequest.aiUrgency}
-            size="sm"
-          />
-        </View>
-
         <View style={styles.statusExplanationBox}>
           <Ionicons
             name={
@@ -175,10 +165,10 @@ export const LeaveRequestSection: React.FC<LeaveRequestSectionProps> = ({
           />
           <Text style={styles.statusExplanationText}>
             {leaveRequest.status === 'MENUNGGU'
-              ? 'Pengajuan izin Anda sedang menunggu pemeriksaan dan keputusan Asisten Praktikum.'
+              ? 'Pengajuan izin Anda berstatus MENUNGGU dan akan direview serta ditentukan statusnya secara manual oleh Asisten Praktikum.'
               : leaveRequest.status === 'DITERIMA'
-              ? 'Pengajuan izin Anda telah DITERIMA oleh asisten. Kehadiran Anda tercatat sebagai Izin.'
-              : 'Pengajuan izin Anda DITOLAK oleh asisten.'}
+              ? 'Pengajuan izin Anda telah DITERIMA oleh Asisten Praktikum. Kehadiran Anda tercatat sebagai Izin.'
+              : 'Pengajuan izin Anda DITOLAK oleh Asisten Praktikum.'}
           </Text>
         </View>
 
@@ -302,9 +292,9 @@ export const LeaveRequestSection: React.FC<LeaveRequestSectionProps> = ({
             <Text style={styles.charCountText}>{reasonText.trim().length}/500 karakter</Text>
 
             <View style={styles.aiNoteBox}>
-              <Ionicons name="bulb-outline" size={16} color={APP_COLORS.primary} />
+              <Ionicons name="shield-checkmark-outline" size={16} color={APP_COLORS.primary} />
               <Text style={styles.aiNoteText}>
-                Alasan izin akan diklasifikasikan otomatis oleh AI untuk membantu pemeriksaan asisten. Keputusan akhir tetap ditentukan oleh Asisten Praktikum.
+                Pengajuan izin akan dikirim dengan status MENUNGGU untuk direview dan ditentukan statusnya (Diterima / Ditolak) secara manual oleh Asisten Praktikum.
               </Text>
             </View>
 

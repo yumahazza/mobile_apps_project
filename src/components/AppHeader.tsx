@@ -29,21 +29,25 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 }) => {
   return (
     <View style={styles.headerWrapper}>
-      <StatusBar style="light" />
+      <StatusBar style="dark" />
       <View style={styles.headerContent}>
-        {/* Left: Back button or App Brand Icon */}
+        {/* Left: Back button or Brand Pill */}
         <View style={styles.leftContainer}>
           {onBack ? (
             <Pressable
               onPress={onBack}
+              hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Kembali"
-              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
-              <Ionicons name="arrow-back" size={22} color={APP_COLORS.white} />
+              style={({ pressed }) => [
+                styles.circleButton,
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="chevron-back" size={20} color="#0F172A" />
             </Pressable>
           ) : (
-            <View style={styles.brandIconWrapper}>
-              <Ionicons name="school" size={20} color={APP_COLORS.white} />
+            <View style={styles.brandBadge}>
+              <Ionicons name="layers" size={18} color="#4F46E5" />
             </View>
           )}
         </View>
@@ -67,10 +71,14 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           ) : onNotificationPress ? (
             <Pressable
               onPress={onNotificationPress}
+              hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Notifikasi"
-              style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
-              <Ionicons name="notifications-outline" size={22} color={APP_COLORS.white} />
+              style={({ pressed }) => [
+                styles.circleButton,
+                pressed && styles.pressed,
+              ]}>
+              <Ionicons name="notifications-outline" size={20} color="#0F172A" />
               {hasUnreadNotifications && <View style={styles.notificationDot} />}
             </Pressable>
           ) : (
@@ -84,30 +92,30 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerWrapper: {
-    backgroundColor: APP_COLORS.primary,
+    backgroundColor: '#F6F7FB',
     width: '100%',
-    paddingTop: Platform.OS === 'ios' ? 8 : 10,
-    paddingBottom: 14,
+    paddingTop: Platform.OS === 'ios' ? 6 : 10,
+    paddingBottom: 10,
     paddingHorizontal: APP_SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: APP_COLORS.deepBlue,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
+    minHeight: 46,
   },
   leftContainer: {
-    width: 44,
+    width: 46,
     alignItems: 'flex-start',
     justifyContent: 'center',
   },
-  brandIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  brandBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -119,47 +127,49 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.white,
-    letterSpacing: 0.3,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
     textAlign: 'center',
   },
   subtitleText: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 1,
+    color: '#64748B',
+    marginTop: 2,
     textAlign: 'center',
   },
   rightContainer: {
-    width: 44,
+    width: 46,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  circleButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   pressed: {
-    opacity: 0.75,
-    transform: [{ scale: 0.95 }],
+    opacity: 0.72,
   },
   notificationDot: {
     position: 'absolute',
-    top: 9,
-    right: 9,
+    top: 10,
+    right: 11,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#F43F5E',
     borderWidth: 1.5,
-    borderColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.white,
   },
   placeholder: {
-    width: 40,
+    width: 42,
+    height: 42,
   },
 });
 

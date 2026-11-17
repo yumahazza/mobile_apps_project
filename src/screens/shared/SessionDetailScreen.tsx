@@ -304,10 +304,10 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
             />
           )}
 
-          {/* If Assistant: button to Pemeriksaan Izin (Fritz) */}
+          {/* If Assistant: button to Pemeriksaan Izin (Manual Review Asisten) */}
           {activeRole === 'assistant' && (
             <CustomButton
-              title="Periksa Pengajuan Izin (AI)"
+              title="Review Pengajuan Izin Praktikan"
               variant="outline"
               size="lg"
               style={styles.extraBtn}
