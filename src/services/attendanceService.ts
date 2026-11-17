@@ -11,7 +11,6 @@
 import {
   collection,
   doc,
-  getFirestore,
   onSnapshot,
   query,
   runTransaction,
@@ -19,13 +18,16 @@ import {
   where,
   type Timestamp,
 } from '@react-native-firebase/firestore';
-import { getAuth } from '@react-native-firebase/auth';
+import {
+  getFirestoreDb,
+  getSafeAuthUid,
+  getSafeFirestoreDb,
+} from '@/services/firebaseClient';
 import type {
   AttendanceRecordItem,
   AttendanceStats,
 } from '@/types/attendance';
 
-const db = getFirestore();
 const ATTENDANCES_COLLECTION = 'attendances';
 const SCHEDULES_COLLECTION = 'schedules';
 
@@ -110,14 +112,7 @@ export async function submitPracticumAttendance(
   }
 
   // Identitas Firebase Auth
-  let authUid: string | null = null;
-  try {
-    authUid = getAuth().currentUser?.uid ?? null;
-  } catch {
-    authUid = null;
-  }
-
-  const effectiveStudentId = authUid;
+  const effectiveStudentId = getSafeAuthUid();
 
   if (!effectiveStudentId?.trim()) {
     throw new Error(
@@ -131,6 +126,7 @@ export async function submitPracticumAttendance(
     );
   }
 
+  const db = getFirestoreDb();
   const attendanceDocId = `${scheduleId}_${effectiveStudentId}`;
   const attendanceDocRef = doc(db, ATTENDANCES_COLLECTION, attendanceDocId);
   const scheduleDocRef = doc(db, SCHEDULES_COLLECTION, scheduleId);
@@ -206,6 +202,13 @@ export function subscribeToScheduleAttendances(
     return () => undefined;
   }
 
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData([]);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
+    return () => undefined;
+  }
+
   const attendancesQuery = query(
     collection(db, ATTENDANCES_COLLECTION),
     where('scheduleId', '==', scheduleId),
@@ -263,6 +266,13 @@ export function subscribeToStudentAttendanceForSchedule(
     return () => undefined;
   }
 
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData(null);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
+    return () => undefined;
+  }
+
   const attendanceDocId = `${scheduleId}_${studentId}`;
   const attendanceDocRef = doc(db, ATTENDANCES_COLLECTION, attendanceDocId);
 
@@ -310,6 +320,13 @@ export function subscribeToStudentHistory(
   if (!studentUid?.trim()) {
     onData([]);
     onError('UID praktikan tidak tersedia. Silakan login kembali.');
+    return () => undefined;
+  }
+
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData([]);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
     return () => undefined;
   }
 

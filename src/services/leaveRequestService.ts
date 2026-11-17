@@ -11,7 +11,6 @@
 import {
   collection,
   doc,
-  getFirestore,
   onSnapshot,
   query,
   runTransaction,
@@ -20,7 +19,10 @@ import {
   type Timestamp,
   type Firestore,
 } from '@react-native-firebase/firestore';
-import { getAuth } from '@react-native-firebase/auth';
+import {
+  getSafeAuthUid,
+  getSafeFirestoreDb,
+} from '@/services/firebaseClient';
 import type {
   LeaveAIStatus,
   LeaveRequestItem,
@@ -59,11 +61,7 @@ function notifyLocalListeners() {
 }
 
 function getSafeFirestore(): Firestore | null {
-  try {
-    return getFirestore();
-  } catch {
-    return null;
-  }
+  return getSafeFirestoreDb();
 }
 
 export interface SubmitLeaveRequestInput {
@@ -205,12 +203,7 @@ export async function submitLeaveRequest(
     throw new Error(validationError);
   }
 
-  let authUid: string | null = null;
-  try {
-    authUid = getAuth().currentUser?.uid ?? null;
-  } catch {
-    authUid = null;
-  }
+  const authUid = getSafeAuthUid();
 
   const effectiveStudentId = authUid || studentId;
   if (!effectiveStudentId?.trim()) {
@@ -381,12 +374,7 @@ export async function reviewLeaveRequest(
     throw new Error('Keputusan izin harus DITERIMA atau DITOLAK.');
   }
 
-  let authUid: string | null = null;
-  try {
-    authUid = getAuth().currentUser?.uid ?? null;
-  } catch {
-    authUid = null;
-  }
+  const authUid = getSafeAuthUid();
 
   const effectiveAssistantId = authUid || assistantId || 'assistant';
   const leaveDocId = `${scheduleId}_${studentId}`;

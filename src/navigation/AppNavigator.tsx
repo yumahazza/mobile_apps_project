@@ -22,6 +22,7 @@ export const AppNavigator: React.FC = () => {
     isAuthenticated,
     activeRole,
     authError,
+    firebaseUnavailable,
     logout,
   } = useApp();
 
@@ -67,7 +68,9 @@ export const AppNavigator: React.FC = () => {
           ) : authError && !isAuthenticated ? (
             <View style={styles.center}>
               <Text style={styles.errorTitle}>
-                Profil gagal dimuat
+                {firebaseUnavailable
+                  ? 'Development Build Diperlukan'
+                  : 'Profil gagal dimuat'}
               </Text>
 
               <Text style={styles.errorMessage}>
@@ -75,32 +78,36 @@ export const AppNavigator: React.FC = () => {
               </Text>
 
               <Text style={styles.errorHint}>
-                Periksa koneksi internet dan aturan akses Firestore.
+                {firebaseUnavailable
+                  ? 'Bangun aplikasi dengan EAS/Expo Development Build (Android), lalu jalankan npx expo start --dev-client.'
+                  : 'Periksa koneksi internet dan aturan akses Firestore.'}
               </Text>
 
-              {logoutError ? (
+              {!firebaseUnavailable && logoutError ? (
                 <Text style={styles.errorMessage}>
                   {logoutError}
                 </Text>
               ) : null}
 
-              <Pressable
-                onPress={handleLogout}
-                disabled={loggingOut}
-                style={({ pressed }) => [
-                  styles.errorButton,
-                  pressed && styles.pressed,
-                  loggingOut && styles.disabledButton,
-                ]}
-              >
-                {loggingOut ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.errorButtonText}>
-                    Keluar dan kembali ke login
-                  </Text>
-                )}
-              </Pressable>
+              {!firebaseUnavailable ? (
+                <Pressable
+                  onPress={handleLogout}
+                  disabled={loggingOut}
+                  style={({ pressed }) => [
+                    styles.errorButton,
+                    pressed && styles.pressed,
+                    loggingOut && styles.disabledButton,
+                  ]}
+                >
+                  {loggingOut ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.errorButtonText}>
+                      Keluar dan kembali ke login
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null}
             </View>
           ) : !isAuthenticated ? (
             <AuthScreen />

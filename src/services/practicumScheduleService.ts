@@ -14,16 +14,18 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  getFirestore,
   onSnapshot,
   query,
   serverTimestamp,
   updateDoc,
   where,
 } from '@react-native-firebase/firestore';
+import {
+  getFirestoreDb,
+  getSafeFirestoreDb,
+} from '@/services/firebaseClient';
 import type { SessionStatus } from '@/data/schedules';
 
-const db = getFirestore();
 const SCHEDULES_COLLECTION = 'schedules';
 const USERS_COLLECTION = 'users';
 
@@ -136,6 +138,13 @@ export function subscribeToPracticumSchedules(
     return () => undefined;
   }
 
+  const db = getSafeFirestoreDb();
+  if (!db) {
+    onData([]);
+    onError('Cloud Firestore belum siap. Gunakan Development Build Android/iOS.');
+    return () => undefined;
+  }
+
   const base = collection(db, SCHEDULES_COLLECTION);
   const schedulesQuery =
     role === 'assistant'
@@ -164,6 +173,7 @@ export async function createPracticumSchedule(
   if (validationError) throw new Error(validationError);
   if (!assistant.uid) throw new Error('UID asisten tidak tersedia.');
 
+  const db = getFirestoreDb();
   const enrolledStudents = [...new Set(input.enrolledStudents)];
   const created = await addDoc(collection(db, SCHEDULES_COLLECTION), {
     courseName: input.courseName.trim(),
@@ -190,6 +200,7 @@ export async function updatePracticumSchedule(
   if (validationError) throw new Error(validationError);
   if (!scheduleId) throw new Error('ID jadwal tidak tersedia.');
 
+  const db = getFirestoreDb();
   const enrolledStudents = [...new Set(input.enrolledStudents)];
   await updateDoc(doc(db, SCHEDULES_COLLECTION, scheduleId), {
     courseName: input.courseName.trim(),
@@ -205,7 +216,7 @@ export async function updatePracticumSchedule(
 
 export async function deletePracticumSchedule(scheduleId: string): Promise<void> {
   if (!scheduleId) throw new Error('ID jadwal tidak tersedia.');
-  await deleteDoc(doc(db, SCHEDULES_COLLECTION, scheduleId));
+  await deleteDoc(doc(getFirestoreDb(), SCHEDULES_COLLECTION, scheduleId));
 }
 
 export async function updatePracticumSessionStatus(
@@ -216,7 +227,7 @@ export async function updatePracticumSessionStatus(
   if (status !== 'DIBUKA' && status !== 'SELESAI') {
     throw new Error('Status sesi tidak valid.');
   }
-  await updateDoc(doc(db, SCHEDULES_COLLECTION, scheduleId), {
+  await updateDoc(doc(getFirestoreDb(), SCHEDULES_COLLECTION, scheduleId), {
     status,
     updatedAt: serverTimestamp(),
   });
@@ -225,7 +236,7 @@ export async function updatePracticumSessionStatus(
 /** Used by the assistant participant roster and the schedule form. */
 export async function getStudentDirectory(): Promise<StudentOption[]> {
   const studentsQuery = query(
-    collection(db, USERS_COLLECTION),
+    collection(getFirestoreDb(), USERS_COLLECTION),
     where('role', '==', 'student'),
   );
   const snapshot = await getDocs(studentsQuery);
@@ -247,11 +258,9 @@ export async function updatePracticumParticipants(
 ): Promise<void> {
   if (!scheduleId) throw new Error('ID jadwal tidak tersedia.');
   const enrolledStudents = [...new Set(studentUids.filter(Boolean))];
-  await updateDoc(doc(db, SCHEDULES_COLLECTION, scheduleId), {
+  await updateDoc(doc(getFirestoreDb(), SCHEDULES_COLLECTION, scheduleId), {
     enrolledStudents,
     totalStudents: enrolledStudents.length,
     updatedAt: serverTimestamp(),
   });
 }
-
-export { db as practicumFirestore };
