@@ -47,6 +47,17 @@ Aplikasi mobile presensi praktikum berbasis **React Native (Expo SDK 58)** denga
 
 ---
 
+## Akun Demo
+
+Gunakan kredensial berikut untuk mencoba aplikasi berdasarkan peran:
+
+| Peran | Email | Password |
+| --- | --- | --- |
+| **Asisten** | `asisten@gmail.com` | `Asisten` |
+| **Mahasiswa** | `mahasiswa@gmail.com` | `Mahasiswa` |
+
+---
+
 ## Build & Pengujian
 
 ### Verifikasi Statis & Automated E2E Logic Test
