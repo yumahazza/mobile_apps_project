@@ -18,6 +18,7 @@ import {
 } from '@/services/sessionControlService';
 import type { PracticumSchedule } from '@/services/practicumScheduleService';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -38,27 +39,35 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
   navigation,
 }) => {
   const {
-    activeSchedule,
+    activeScheduleId,
     activeUser,
     activeRole,
   } = useApp();
 
-  const { schedules, loading: schedulesLoading } = useFirestoreSchedules(
-    activeUser.id,
-    'assistant',
-  );
+  const { schedules, loading: schedulesLoading, error: schedulesError } =
+    useFirestoreSchedules(activeUser.id, 'assistant');
 
-  const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
+  const selectedFromList =
+    schedules.find(s => s.id === navigation.params?.scheduleId) ||
+    schedules.find(s => s.id === activeScheduleId) ||
+    schedules[0];
 
-  const [realtimeSchedule, setRealtimeSchedule] = useState<PracticumSchedule | null>(null);
+  const targetScheduleId =
+    navigation.params?.scheduleId || selectedFromList?.id || '';
+
+  const [realtimeState, setRealtimeState] = useState<{
+    id: string;
+    schedule: PracticumSchedule | null;
+  }>({ id: '', schedule: null });
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // Berlangganan dokumen jadwal spesifik di Firestore secara real-time
   useEffect(() => {
     if (!targetScheduleId) return undefined;
+    const activeId = targetScheduleId;
     const unsubscribe = subscribeToSingleSchedule(
-      targetScheduleId,
-      schedule => setRealtimeSchedule(schedule),
+      activeId,
+      schedule => setRealtimeState({ id: activeId, schedule }),
       err => {
         // Fallback jika listener gagal
         console.warn('Realtime schedule subscription error:', err);
@@ -67,11 +76,12 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
     return () => unsubscribe();
   }, [targetScheduleId]);
 
-  const currentSchedule =
-    realtimeSchedule ||
-    schedules.find(s => s.id === targetScheduleId) ||
-    activeSchedule ||
-    schedules[0];
+  const realtimeSchedule =
+    targetScheduleId && realtimeState.id === targetScheduleId
+      ? realtimeState.schedule
+      : null;
+
+  const currentSchedule = realtimeSchedule || selectedFromList;
 
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
@@ -139,123 +149,126 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
           </View>
         )}
 
-        {/* Session Info Card */}
-        {currentSchedule && (
-          <Card style={styles.sessionCard}>
-            <View style={styles.sessionRow}>
-              <View style={styles.sessionIconBox}>
-                <Ionicons name="lock-closed" size={18} color={APP_COLORS.primary} />
-              </View>
-              <View style={styles.sessionTextCol}>
-                <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
-                <Text style={styles.sessionMeta}>
-                  {currentSchedule.time} | {currentSchedule.room}
-                </Text>
-              </View>
-            </View>
-          </Card>
-        )}
-
-        {/* Status Sesi Card */}
-        {currentSchedule && (
-          <Card style={styles.statusCard}>
-            <Text style={styles.statusCardTitle}>Status Sesi</Text>
-            <View style={styles.statusBadgeRow}>
-              <StatusBadge status={currentSchedule.status} size="md" />
-            </View>
-            <Text style={styles.statusDescText}>
-              {isOpened
-                ? 'Sesi sedang berlangsung. Praktikan dapat melakukan presensi.'
-                : isNotOpened
-                ? 'Sesi belum dimulai. Praktikan belum dapat melakukan presensi.'
-                : 'Sesi telah ditutup & selesai. Presensi telah dinonaktifkan.'}
+        {/* Empty / Loading / Error State when no schedule */}
+        {schedulesLoading && !currentSchedule ? (
+          <View style={styles.loadingBanner}>
+            <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            <Text style={styles.loadingBannerText}>
+              Memuat jadwal sesi dari Cloud Firestore...
             </Text>
-          </Card>
-        )}
-
-        {/* Action Buttons Section */}
-        <View style={styles.actionButtonsContainer}>
-          {isNotOpened && (
-            <CustomButton
-              title={isSaving ? 'Menyimpan...' : 'Buka Sesi'}
-              variant="primary"
-              size="lg"
-              disabled={isSaving || schedulesLoading}
-              leftIcon={
-                isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="play" size={18} color={APP_COLORS.white} />
-                )
-              }
-              onPress={handleOpenModal}
-            />
-          )}
-
-          {isOpened && (
-            <>
-              <CustomButton
-                title={isSaving ? 'Menyimpan...' : 'Tutup Sesi'}
-                variant="primary"
-                size="lg"
-                disabled={isSaving || schedulesLoading}
-                leftIcon={
-                  isSaving ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Ionicons name="power-outline" size={18} color={APP_COLORS.white} />
-                  )
-                }
-                onPress={handleCloseModal}
-              />
-              <CustomButton
-                title="Selesaikan Sesi"
-                variant="outline"
-                size="lg"
-                disabled={isSaving || schedulesLoading}
-                style={styles.secondaryActionBtn}
-                leftIcon={
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={18}
-                    color={APP_COLORS.navyHeading}
-                  />
-                }
-                onPress={handleCloseModal}
-              />
-            </>
-          )}
-
-          {isFinished && (
-            <CustomButton
-              title="Sesi Telah Selesai"
-              variant="outline"
-              disabled
-              size="lg"
-              leftIcon={
-                <Ionicons
-                  name="checkmark-done"
-                  size={18}
-                  color={APP_COLORS.neutral500}
-                />
-              }
-              onPress={() => {}}
-            />
-          )}
-        </View>
-
-        {/* Blue Info Callout Box */}
-        <View style={styles.infoCallout}>
-          <Ionicons
-            name="information-circle"
-            size={20}
-            color={APP_COLORS.primary}
-            style={styles.infoIcon}
+          </View>
+        ) : schedulesError && !currentSchedule ? (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Jadwal"
+            description={schedulesError}
           />
-          <Text style={styles.infoCalloutText}>
-            Setelah sesi ditutup, presensi tidak dapat dilakukan lagi oleh praktikan.
-          </Text>
-        </View>
+        ) : !currentSchedule ? (
+          <EmptyState
+            icon="calendar-outline"
+            title="Belum Ada Sesi Praktikum"
+            description="Buat jadwal praktikum terlebih dahulu di menu Jadwal sebelum membuka sesi presensi."
+          />
+        ) : (
+          <>
+            {/* Session Info Card */}
+            <Card style={styles.sessionCard}>
+              <View style={styles.sessionRow}>
+                <View style={styles.sessionIconBox}>
+                  <Ionicons name="lock-closed" size={18} color={APP_COLORS.primary} />
+                </View>
+                <View style={styles.sessionTextCol}>
+                  <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
+                  <Text style={styles.sessionMeta}>
+                    {currentSchedule.time} | {currentSchedule.room}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {/* Status Sesi Card */}
+            <Card style={styles.statusCard}>
+              <Text style={styles.statusCardTitle}>Status Sesi</Text>
+              <View style={styles.statusBadgeRow}>
+                <StatusBadge status={currentSchedule.status} size="md" />
+              </View>
+              <Text style={styles.statusDescText}>
+                {isOpened
+                  ? 'Sesi sedang berlangsung. Praktikan dapat melakukan presensi.'
+                  : isNotOpened
+                  ? 'Sesi belum dimulai. Praktikan belum dapat melakukan presensi.'
+                  : 'Sesi telah ditutup & selesai. Presensi telah dinonaktifkan.'}
+              </Text>
+            </Card>
+
+            {/* Action Buttons Section */}
+            <View style={styles.actionButtonsContainer}>
+              {isNotOpened && (
+                <CustomButton
+                  title={isSaving ? 'Menyimpan...' : 'Buka Sesi'}
+                  variant="primary"
+                  size="lg"
+                  disabled={isSaving || schedulesLoading}
+                  leftIcon={
+                    isSaving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="play" size={18} color={APP_COLORS.white} />
+                    )
+                  }
+                  onPress={handleOpenModal}
+                />
+              )}
+
+              {isOpened && (
+                <CustomButton
+                  title={isSaving ? 'Menyimpan...' : 'Tutup & Selesaikan Sesi'}
+                  variant="danger"
+                  size="lg"
+                  disabled={isSaving || schedulesLoading}
+                  leftIcon={
+                    isSaving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="power-outline" size={18} color={APP_COLORS.white} />
+                    )
+                  }
+                  onPress={handleCloseModal}
+                />
+              )}
+
+              {isFinished && (
+                <CustomButton
+                  title="Sesi Telah Selesai"
+                  variant="outline"
+                  disabled
+                  size="lg"
+                  leftIcon={
+                    <Ionicons
+                      name="checkmark-done"
+                      size={18}
+                      color={APP_COLORS.neutral500}
+                    />
+                  }
+                  onPress={() => {}}
+                />
+              )}
+            </View>
+
+            {/* Blue Info Callout Box */}
+            <View style={styles.infoCallout}>
+              <Ionicons
+                name="information-circle"
+                size={20}
+                color={APP_COLORS.primary}
+                style={styles.infoIcon}
+              />
+              <Text style={styles.infoCalloutText}>
+                Setelah sesi ditutup, presensi tidak dapat dilakukan lagi oleh praktikan.
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       {/* Confirmation Modal */}

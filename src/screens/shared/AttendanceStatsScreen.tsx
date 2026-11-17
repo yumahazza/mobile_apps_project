@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -11,6 +12,7 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { DonutChart } from '@/components/DonutChart';
@@ -69,17 +71,20 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
   navigation,
 }) => {
   const {
-    activeSchedule,
+    activeScheduleId,
     activeRole,
     activeUser,
   } = useApp();
 
-  const { schedules } = useFirestoreSchedules(activeUser.id, activeRole);
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+  } = useFirestoreSchedules(activeUser.id, activeRole);
 
-  const targetScheduleId = navigation.params?.scheduleId || activeSchedule?.id;
   const currentSchedule =
-    schedules.find((s) => s.id === targetScheduleId) ||
-    activeSchedule ||
+    schedules.find((s) => s.id === navigation.params?.scheduleId) ||
+    schedules.find((s) => s.id === activeScheduleId) ||
     schedules[0];
 
   const { stats } = useRealtimeAttendance(
@@ -99,43 +104,62 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Session Info Card */}
-        {currentSchedule && (
-          <Card style={styles.sessionCard}>
-            <View style={styles.sessionRow}>
-              <View style={styles.iconBox}>
-                <Ionicons name="stats-chart" size={18} color={APP_COLORS.primary} />
+        {schedulesLoading ? (
+          <View style={styles.stateBox}>
+            <ActivityIndicator size="large" color={APP_COLORS.primary} />
+            <Text style={styles.stateText}>Memuat statistik kehadiran...</Text>
+          </View>
+        ) : schedulesError ? (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Statistik"
+            description={schedulesError}
+          />
+        ) : !currentSchedule ? (
+          <EmptyState
+            icon="stats-chart-outline"
+            title="Belum Ada Statistik Kehadiran"
+            description="Statistik per sesi akan muncul setelah Anda memiliki jadwal praktikum."
+          />
+        ) : (
+          <>
+            {/* Session Info Card */}
+            <Card style={styles.sessionCard}>
+              <View style={styles.sessionRow}>
+                <View style={styles.iconBox}>
+                  <Ionicons name="stats-chart" size={18} color={APP_COLORS.primary} />
+                </View>
+                <View style={styles.sessionTextCol}>
+                  <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
+                  <Text style={styles.sessionMeta}>
+                    {currentSchedule.time} | {currentSchedule.room}
+                  </Text>
+                </View>
               </View>
-              <View style={styles.sessionTextCol}>
-                <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
-                <Text style={styles.sessionMeta}>
-                  {currentSchedule.time} | {currentSchedule.room}
-                </Text>
+            </Card>
+
+            {/* Donut Chart Card */}
+            <Card style={styles.chartCard}>
+              <DonutChart
+                percentage={stats.attendancePercentage}
+                hadir={stats.hadirCount}
+                izin={stats.izinCount}
+                alfa={stats.alfaCount}
+              />
+            </Card>
+
+            {/* Section Per Sesi (Horizontal Progress Bars) */}
+            <View style={styles.perSessionSection}>
+              <Text style={styles.sectionTitle}>Per Sesi</Text>
+
+              <View style={styles.barsList}>
+                {schedules.map((schedule) => (
+                  <SessionProgressItem key={schedule.id} schedule={schedule} />
+                ))}
               </View>
             </View>
-          </Card>
+          </>
         )}
-
-        {/* Donut Chart Card */}
-        <Card style={styles.chartCard}>
-          <DonutChart
-            percentage={stats.attendancePercentage}
-            hadir={stats.hadirCount}
-            izin={stats.izinCount}
-            alfa={stats.alfaCount}
-          />
-        </Card>
-
-        {/* Section Per Sesi (Horizontal Progress Bars) */}
-        <View style={styles.perSessionSection}>
-          <Text style={styles.sectionTitle}>Per Sesi</Text>
-
-          <View style={styles.barsList}>
-            {schedules.map((schedule) => (
-              <SessionProgressItem key={schedule.id} schedule={schedule} />
-            ))}
-          </View>
-        </View>
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -157,6 +181,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.lg,
     paddingTop: APP_SPACING.md,
     paddingBottom: APP_SPACING.xl,
+  },
+  stateBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: APP_SPACING.xxxl,
+    gap: APP_SPACING.sm,
+  },
+  stateText: {
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
   },
   sessionCard: {
     padding: APP_SPACING.md,

@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   StyleSheet,
@@ -8,7 +9,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
+import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useStudentLeaveRequests } from '@/hooks/useRealtimeLeaveRequests';
+import { useStudentAttendanceHistory } from '@/hooks/useStudentAttendanceHistory';
+import { subscribeToScheduleLeaveRequests } from '@/services/leaveRequestService';
+import type { LeaveRequestItem } from '@/types/leaveRequest';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
@@ -29,63 +36,273 @@ interface NotificationItem {
   iconColor: string;
   title: string;
   message: string;
-  timeAgo: string;
+  meta: string;
+  onPress: () => void;
 }
 
 export const NotificationScreen: React.FC<NotificationScreenProps> = ({
   navigation,
 }) => {
-  const { activeRole, activeSchedule, attendanceLogs } = useApp();
+  const { activeRole, activeUser, setActiveScheduleId } = useApp();
 
-  const notifications: NotificationItem[] = [
-    {
-      id: 'notif-1',
-      iconName: 'notifications',
-      iconBgColor: '#FEE2E2',
-      iconColor: '#DC2626',
-      title: 'Sesi baru dibuka',
-      message: `${activeSchedule?.courseName || 'Pemrograman Mobile'} - Sesi telah dibuka oleh asisten`,
-      timeAgo: '2 menit yang lalu',
-    },
-    {
-      id: 'notif-2',
-      iconName: 'shield-checkmark',
-      iconBgColor: '#DCFCE7',
-      iconColor: '#16A34A',
-      title: 'Presensi mahasiswa',
-      message: attendanceLogs[0]
-        ? `${attendanceLogs[0].studentName} sudah melakukan presensi`
-        : 'Presensi mahasiswa tercatat di sistem',
-      timeAgo: '5 menit yang lalu',
-    },
-    {
-      id: 'notif-3',
-      iconName: 'calendar',
-      iconBgColor: APP_COLORS.softBlue,
-      iconColor: APP_COLORS.primary,
-      title: 'Jadwal praktikum',
-      message: 'Jadwal sesi praktikum semester ini telah diperbarui',
-      timeAgo: '1 jam yang lalu',
-    },
-    {
-      id: 'notif-4',
-      iconName: 'alert-circle',
-      iconBgColor: '#FEF3C7',
-      iconColor: '#D97706',
-      title: 'Peringatan',
-      message: 'Jangan lupa melakukan presensi sebelum sesi berakhir',
-      timeAgo: '3 jam yang lalu',
-    },
-    {
-      id: 'notif-5',
-      iconName: 'information-circle',
-      iconBgColor: APP_COLORS.softBlue,
-      iconColor: APP_COLORS.primary,
-      title: 'Informasi',
-      message: 'Pembaruan data kehadiran tersimpan secara realtime',
-      timeAgo: 'Kemarin',
-    },
-  ];
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+  } = useFirestoreSchedules(activeUser.id, activeRole);
+
+  const isStudent = activeRole === 'student';
+
+  const {
+    leaveRequests: studentLeaves,
+    loading: studentLeavesLoading,
+  } = useStudentLeaveRequests(isStudent ? activeUser.id : undefined);
+
+  const {
+    historyRecords,
+    loading: historyLoading,
+  } = useStudentAttendanceHistory(isStudent ? activeUser.id : undefined);
+
+  const [assistantLeavesBySchedule, setAssistantLeavesBySchedule] = useState<
+    Record<string, LeaveRequestItem[]>
+  >({});
+
+  const scheduleIdsKey = !isStudent
+    ? schedules.map((schedule) => schedule.id).join('|')
+    : '';
+
+  useEffect(() => {
+    if (!scheduleIdsKey) {
+      return undefined;
+    }
+
+    const scheduleIds = scheduleIdsKey.split('|').filter(Boolean);
+    const unsubscribes = scheduleIds.map((scheduleId) =>
+      subscribeToScheduleLeaveRequests(
+        scheduleId,
+        (items) => {
+          setAssistantLeavesBySchedule((prev) => ({
+            ...prev,
+            [scheduleId]: items,
+          }));
+        },
+        () => {
+          // Abaikan error per jadwal agar notifikasi jadwal lain tetap tampil.
+        },
+      ),
+    );
+
+    return () => {
+      unsubscribes.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [scheduleIdsKey]);
+
+  const notifications = useMemo<NotificationItem[]>(() => {
+    const items: NotificationItem[] = [];
+
+    if (!isStudent) {
+      schedules.forEach((schedule) => {
+        const leaves = assistantLeavesBySchedule[schedule.id] ?? [];
+        leaves
+          .filter((req) => req.status === 'MENUNGGU')
+          .forEach((req) => {
+            items.push({
+              id: `leave-pending-${req.id}`,
+              iconName: 'document-text',
+              iconBgColor: '#FEF3C7',
+              iconColor: '#D97706',
+              title: 'Pengajuan Izin Menunggu',
+              message: `${req.studentName} (${schedule.courseName}) • AI: ${req.aiClassification}`,
+              meta: req.createdAt,
+              onPress: () => {
+                setActiveScheduleId(schedule.id);
+                navigation.navigate('LeaveApproval', { scheduleId: schedule.id });
+              },
+            });
+          });
+      });
+
+      schedules
+        .filter((s) => s.status === 'DIBUKA')
+        .forEach((s) => {
+          items.push({
+            id: `open-${s.id}`,
+            iconName: 'radio',
+            iconBgColor: '#DCFCE7',
+            iconColor: '#16A34A',
+            title: 'Sesi Sedang Berlangsung',
+            message: `${s.courseName} (${s.className}) sedang dibuka di ${s.room}.`,
+            meta: `${s.date} • ${s.time}`,
+            onPress: () => {
+              setActiveScheduleId(s.id);
+              navigation.navigate('SessionControl', { scheduleId: s.id });
+            },
+          });
+        });
+
+      schedules
+        .filter((s) => s.status === 'BELUM_DIBUKA')
+        .forEach((s) => {
+          items.push({
+            id: `upcoming-${s.id}`,
+            iconName: 'calendar',
+            iconBgColor: APP_COLORS.softBlue,
+            iconColor: APP_COLORS.primary,
+            title: 'Jadwal Menunggu Dibuka',
+            message: `${s.courseName} (${s.className}) di ${s.room}.`,
+            meta: `${s.date} • ${s.time}`,
+            onPress: () => {
+              setActiveScheduleId(s.id);
+              navigation.navigate('SessionControl', { scheduleId: s.id });
+            },
+          });
+        });
+
+      schedules
+        .filter((s) => s.status === 'SELESAI')
+        .slice(0, 5)
+        .forEach((s) => {
+          items.push({
+            id: `recap-${s.id}`,
+            iconName: 'stats-chart',
+            iconBgColor: '#F1F5F9',
+            iconColor: '#475569',
+            title: 'Rekap & Sentimen Sesi Tersedia',
+            message: `${s.courseName} (${s.className}) telah selesai.`,
+            meta: `${s.date} • ${s.time}`,
+            onPress: () => {
+              setActiveScheduleId(s.id);
+              navigation.navigate('SessionRecap', { scheduleId: s.id });
+            },
+          });
+        });
+
+      return items;
+    }
+
+    const attendedScheduleIds = new Set(historyRecords.map((r) => r.scheduleId));
+
+    schedules
+      .filter((s) => s.status === 'DIBUKA' && !attendedScheduleIds.has(s.id))
+      .forEach((s) => {
+        items.push({
+          id: `stu-open-${s.id}`,
+          iconName: 'notifications',
+          iconBgColor: '#DCFCE7',
+          iconColor: '#16A34A',
+          title: 'Presensi Sedang Dibuka',
+          message: `${s.courseName} (${s.className}) di ${s.room} membuka presensi sekarang.`,
+          meta: `${s.date} • ${s.time}`,
+          onPress: () => {
+            setActiveScheduleId(s.id);
+            navigation.navigate('SessionDetail', { scheduleId: s.id });
+          },
+        });
+      });
+
+    studentLeaves.forEach((req) => {
+      const isApproved = req.status === 'DITERIMA';
+      const isRejected = req.status === 'DITOLAK';
+      items.push({
+        id: `stu-leave-${req.id}`,
+        iconName: isApproved
+          ? 'checkmark-circle'
+          : isRejected
+          ? 'close-circle'
+          : 'time',
+        iconBgColor: isApproved
+          ? '#DCFCE7'
+          : isRejected
+          ? '#FEE2E2'
+          : '#FEF3C7',
+        iconColor: isApproved
+          ? '#16A34A'
+          : isRejected
+          ? '#DC2626'
+          : '#D97706',
+        title: isApproved
+          ? 'Pengajuan Izin Diterima'
+          : isRejected
+          ? 'Pengajuan Izin Ditolak'
+          : 'Pengajuan Izin Menunggu',
+        message: `${req.courseName || 'Praktikum'} • AI: ${req.aiClassification}`,
+        meta: req.reviewedAt || req.createdAt,
+        onPress: () => {
+          setActiveScheduleId(req.scheduleId);
+          navigation.navigate('LeaveRequest', { scheduleId: req.scheduleId });
+        },
+      });
+    });
+
+    schedules
+      .filter((s) => s.status === 'SELESAI')
+      .slice(0, 5)
+      .forEach((s) => {
+        items.push({
+          id: `stu-finished-${s.id}`,
+          iconName: 'chatbubbles',
+          iconBgColor: APP_COLORS.softBlue,
+          iconColor: APP_COLORS.primary,
+          title: 'Sesi Selesai — Pesan & Kesan',
+          message: `${s.courseName} (${s.className}) telah selesai. Anda dapat mengisi ulasan.`,
+          meta: `${s.date} • ${s.time}`,
+          onPress: () => {
+            setActiveScheduleId(s.id);
+            navigation.navigate('SessionDetail', { scheduleId: s.id });
+          },
+        });
+      });
+
+    historyRecords.slice(0, 5).forEach((rec) => {
+      const matchedSchedule = schedules.find((s) => s.id === rec.scheduleId);
+      items.push({
+        id: `stu-att-${rec.id}`,
+        iconName: rec.status === 'Izin' ? 'document-text' : 'shield-checkmark',
+        iconBgColor: rec.status === 'Izin' ? '#FEF3C7' : '#DCFCE7',
+        iconColor: rec.status === 'Izin' ? '#D97706' : '#16A34A',
+        title: `Kehadiran Tercatat (${rec.status})`,
+        message: `${matchedSchedule?.courseName || 'Praktikum'} • ${rec.timestamp}`,
+        meta: rec.date,
+        onPress: () => {
+          navigation.navigate('AttendanceDetail', {
+            record: rec,
+            schedule: matchedSchedule,
+          });
+        },
+      });
+    });
+
+    schedules
+      .filter((s) => s.status === 'BELUM_DIBUKA')
+      .forEach((s) => {
+        items.push({
+          id: `stu-upcoming-${s.id}`,
+          iconName: 'calendar',
+          iconBgColor: APP_COLORS.softBlue,
+          iconColor: APP_COLORS.primary,
+          title: 'Jadwal Praktikum Terdaftar',
+          message: `${s.courseName} (${s.className}) di ${s.room}.`,
+          meta: `${s.date} • ${s.time}`,
+          onPress: () => {
+            setActiveScheduleId(s.id);
+            navigation.navigate('SessionDetail', { scheduleId: s.id });
+          },
+        });
+      });
+
+    return items;
+  }, [
+    isStudent,
+    schedules,
+    assistantLeavesBySchedule,
+    historyRecords,
+    studentLeaves,
+    navigation,
+    setActiveScheduleId,
+  ]);
+
+  const isLoading =
+    schedulesLoading || (isStudent && (studentLeavesLoading || historyLoading));
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -99,37 +316,59 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.listContainer}>
-          {notifications.map((item) => (
-            <Card key={item.id} style={styles.notifCard}>
-              <View style={styles.notifRow}>
-                <View
-                  style={[
-                    styles.iconBox,
-                    { backgroundColor: item.iconBgColor },
-                  ]}>
+        {isLoading ? (
+          <View style={styles.stateContainer}>
+            <ActivityIndicator size="large" color={APP_COLORS.primary} />
+            <Text style={styles.stateText}>Memuat aktivitas terbaru...</Text>
+          </View>
+        ) : schedulesError ? (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Notifikasi"
+            description={schedulesError}
+          />
+        ) : notifications.length === 0 ? (
+          <EmptyState
+            icon="notifications-off-outline"
+            title="Belum Ada Aktivitas"
+            description="Notifikasi sesi praktikum, presensi, dan status pengajuan izin secara real-time akan tampil di sini."
+          />
+        ) : (
+          <View style={styles.listContainer}>
+            {notifications.map((item) => (
+              <Card
+                key={item.id}
+                onPress={item.onPress}
+                style={styles.notifCard}>
+                <View style={styles.notifRow}>
+                  <View
+                    style={[
+                      styles.iconBox,
+                      { backgroundColor: item.iconBgColor },
+                    ]}>
+                    <Ionicons
+                      name={item.iconName}
+                      size={20}
+                      color={item.iconColor}
+                    />
+                  </View>
+                  <View style={styles.textContent}>
+                    <Text style={styles.notifTitle}>{item.title}</Text>
+                    <Text style={styles.notifMessage} numberOfLines={2}>
+                      {item.message}
+                    </Text>
+                    <Text style={styles.notifTime}>{item.meta}</Text>
+                  </View>
                   <Ionicons
-                    name={item.iconName}
-                    size={20}
-                    color={item.iconColor}
+                    name="chevron-forward"
+                    size={16}
+                    color={APP_COLORS.neutral400}
                   />
                 </View>
-                <View style={styles.textContent}>
-                  <Text style={styles.notifTitle}>{item.title}</Text>
-                  <Text style={styles.notifMessage} numberOfLines={2}>
-                    {item.message}
-                  </Text>
-                  <Text style={styles.notifTime}>{item.timeAgo}</Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={16}
-                  color={APP_COLORS.neutral400}
-                />
-              </View>
-            </Card>
-          ))}
-        </View>
+              </Card>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Bottom Navigation */}
@@ -151,6 +390,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.lg,
     paddingTop: APP_SPACING.md,
     paddingBottom: APP_SPACING.xl,
+  },
+  stateContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: APP_SPACING.xxxl,
+    gap: APP_SPACING.sm,
+  },
+  stateText: {
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
   },
   listContainer: {
     gap: APP_SPACING.sm,

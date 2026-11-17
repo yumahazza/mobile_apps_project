@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
@@ -57,6 +58,8 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<PracticumSchedule | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const sortedSchedules = useMemo(
     () => [...schedules].sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)),
@@ -132,24 +135,20 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
       Alert.alert('Jadwal sedang dibuka', 'Tutup sesi terlebih dahulu sebelum menghapus jadwal.');
       return;
     }
-    Alert.alert(
-      'Hapus jadwal?',
-      `Jadwal ${schedule.courseName} - ${schedule.className} akan dihapus permanen.`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deletePracticumSchedule(schedule.id);
-            } catch (err) {
-              Alert.alert('Gagal menghapus', err instanceof Error ? err.message : 'Periksa izin Firestore.');
-            }
-          },
-        },
-      ],
-    );
+    setDeleteTarget(schedule);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      await deletePracticumSchedule(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (err) {
+      Alert.alert('Gagal menghapus', err instanceof Error ? err.message : 'Periksa izin Firestore.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -293,6 +292,30 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal
+        visible={Boolean(deleteTarget)}
+        title="Hapus Jadwal?"
+        subtitle="Jadwal praktikum yang dihapus tidak dapat dipulihkan kembali."
+        details={
+          deleteTarget
+            ? {
+                courseName: deleteTarget.courseName,
+                className: deleteTarget.className,
+                time: `${deleteTarget.date} • ${deleteTarget.time}`,
+                room: deleteTarget.room,
+              }
+            : undefined
+        }
+        confirmText="Ya, Hapus"
+        cancelText="Batal"
+        confirmVariant="danger"
+        loading={deleting}
+        onConfirm={executeDelete}
+        onCancel={() => {
+          if (!deleting) setDeleteTarget(null);
+        }}
+      />
 
       <BottomNavigation
         role={activeRole}

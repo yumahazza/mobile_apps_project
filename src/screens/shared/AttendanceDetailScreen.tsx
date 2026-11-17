@@ -9,10 +9,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
+import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { AttendanceRecord, Schedule } from '@/data/schedules';
+import type { AttendanceRecordItem } from '@/types/attendance';
+import type { PracticumSchedule } from '@/services/practicumScheduleService';
+import type { Schedule } from '@/data/schedules';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
@@ -27,23 +30,58 @@ interface AttendanceDetailScreenProps {
 export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
   navigation,
 }) => {
-  const { activeRole, activeUser, activeSchedule, attendanceLogs } = useApp();
+  const { activeRole } = useApp();
 
-  const record: AttendanceRecord =
-    navigation.params?.record ||
-    attendanceLogs[0] || {
-      id: 'default',
-      scheduleId: activeSchedule?.id || 'sch-1',
-      studentId: activeUser.id,
-      studentName: activeUser.name,
-      nim: activeUser.nim || '12345678',
-      timestamp: '10:02:15 WIB',
-      date: '22 Okt 2026',
-      status: 'Hadir',
-    };
+  const record = navigation.params?.record as AttendanceRecordItem | undefined;
+  const schedule = navigation.params?.schedule as
+    | PracticumSchedule
+    | Schedule
+    | undefined;
 
-  const schedule: Schedule | undefined =
-    navigation.params?.schedule || activeSchedule;
+  if (!record) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+        <AppHeader
+          title="Detail Presensi"
+          onBack={() => navigation.goBack()}
+          onNotificationPress={() => navigation.navigate('Notifications')}
+        />
+        <View style={styles.emptyWrapper}>
+          <EmptyState
+            icon="document-text-outline"
+            title="Detail Kehadiran Tidak Tersedia"
+            description="Pilih salah satu catatan kehadiran dari rekap sesi atau riwayat presensi."
+            actionTitle="Kembali"
+            onActionPress={() => navigation.goBack()}
+          />
+        </View>
+        <BottomNavigation
+          role={activeRole}
+          activeTab={activeRole === 'assistant' ? 'SessionRecap' : 'StudentHistory'}
+          onTabChange={(tabKey) => navigation.navigate(tabKey)}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  const isExcused = record.status === 'Izin';
+  const isAlfa = record.status === 'Alfa';
+
+  const methodText = isExcused
+    ? 'Pengajuan Izin (Disetujui Asisten)'
+    : isAlfa
+    ? 'Belum Tercatat'
+    : 'Presensi Mandiri (Mobile App)';
+
+  const noteText = isExcused
+    ? 'Izin ketidakhadiran disetujui oleh asisten'
+    : isAlfa
+    ? 'Tidak melakukan presensi pada sesi ini'
+    : 'Kehadiran tercatat pada sesi berlangsung';
+
+  const calloutText = isExcused
+    ? 'Status Izin ini disinkronkan secara otomatis dari persetujuan asisten di Cloud Firestore.'
+    : 'Presensi tercatat dengan benar dan telah tersimpan di Cloud Firestore.';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -86,7 +124,7 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
 
           {/* Waktu Presensi */}
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Waktu Presensi</Text>
+            <Text style={styles.detailLabel}>Waktu Tercatat</Text>
             <Text style={styles.detailValue}>{record.timestamp}</Text>
           </View>
 
@@ -99,13 +137,13 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
           {/* Metode */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Metode</Text>
-            <Text style={styles.detailValue}>Presensi Mandiri (Mobile App)</Text>
+            <Text style={styles.detailValue}>{methodText}</Text>
           </View>
 
           {/* Keterangan */}
           <View style={[styles.detailRow, styles.lastRow]}>
             <Text style={styles.detailLabel}>Keterangan</Text>
-            <Text style={styles.detailValue}>-</Text>
+            <Text style={styles.detailValue}>{noteText}</Text>
           </View>
         </Card>
 
@@ -117,9 +155,7 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
             color={APP_COLORS.primary}
             style={styles.infoIcon}
           />
-          <Text style={styles.infoCalloutText}>
-            Presensi tercatat dengan benar dan telah tersimpan di sistem.
-          </Text>
+          <Text style={styles.infoCalloutText}>{calloutText}</Text>
         </View>
       </ScrollView>
 
@@ -142,6 +178,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.lg,
     paddingTop: APP_SPACING.md,
     paddingBottom: APP_SPACING.xl,
+  },
+  emptyWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: APP_SPACING.lg,
   },
   studentCard: {
     alignItems: 'center',
