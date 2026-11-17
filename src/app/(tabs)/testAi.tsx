@@ -1,8 +1,8 @@
-import { createSentimentClassifier } from '../../../ai/sentiment.js';
-import model from '../../../ai/model-edom.json';
+import { Redirect } from 'expo-router';
 
-// Model dibuat sekali di luar komponen agar tidak dibuat ulang setiap render.
-const classify = createSentimentClassifier(model);
-
-const prediction = classify('komentar untuk dianalisis');
-// prediction.label berisi sentimen hasil analisis
+/**
+ * Rute uji coba lama dialihkan ke root AppNavigator.
+ */
+export default function LegacyTestAiRedirect() {
+  return <Redirect href="/" />;
+}

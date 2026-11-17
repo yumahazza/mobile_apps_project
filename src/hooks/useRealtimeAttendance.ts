@@ -23,40 +23,41 @@ export function useRealtimeAttendance(
   scheduleId?: string,
   totalStudents: number = 0,
 ): RealtimeAttendanceState {
-  const [attendances, setAttendances] = useState<AttendanceRecordItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const activeKey = scheduleId?.trim() || '';
+  const [state, setState] = useState<{
+    key: string;
+    attendances: AttendanceRecordItem[];
+    error: string | null;
+  }>({
+    key: '',
+    attendances: [],
+    error: null,
+  });
 
   useEffect(() => {
-    if (!scheduleId?.trim()) {
-      setAttendances([]);
-      setLoading(false);
-      setError(null);
+    if (!activeKey) {
       return undefined;
     }
 
-    setLoading(true);
-    setError(null);
-
+    const targetKey = activeKey;
     const unsubscribe = subscribeToScheduleAttendances(
-      scheduleId,
+      targetKey,
       records => {
-        setAttendances(records);
-        setLoading(false);
-        setError(null);
+        setState({ key: targetKey, attendances: records, error: null });
       },
       err => {
-        setAttendances([]);
-        setError(err);
-        setLoading(false);
+        setState({ key: targetKey, attendances: [], error: err });
       },
     );
 
     return () => {
       unsubscribe();
     };
-  }, [scheduleId]);
+  }, [activeKey]);
 
+  const attendances = activeKey && state.key === activeKey ? state.attendances : [];
+  const loading = Boolean(activeKey) && state.key !== activeKey;
+  const error = activeKey && state.key === activeKey ? state.error : null;
   const stats = calculateAttendanceStats(totalStudents, attendances);
 
   return {

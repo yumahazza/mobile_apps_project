@@ -131,7 +131,7 @@ export const FeedbackSection: React.FC<FeedbackSectionProps> = ({
         </View>
 
         <View style={styles.feedbackDisplayBox}>
-          <Text style={styles.feedbackDisplayText}>"{feedback.comment}"</Text>
+          <Text style={styles.feedbackDisplayText}>&quot;{feedback.comment}&quot;</Text>
         </View>
 
         <View style={styles.infoRow}>

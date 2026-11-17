@@ -435,7 +435,7 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                       </View>
 
                       <Text style={styles.feedbackCommentText}>
-                        "{fb.comment}"
+                        &quot;{fb.comment}&quot;
                       </Text>
                     </Card>
                   ))}

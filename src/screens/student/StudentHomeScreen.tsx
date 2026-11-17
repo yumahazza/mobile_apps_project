@@ -44,8 +44,6 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     activeUser,
     activeScheduleId,
     setActiveScheduleId,
-    hasStudentAttended,
-    getStudentAttendanceForSchedule,
   } = useApp();
   const { schedules, loading: schedulesLoading, error: schedulesError } =
     useFirestoreSchedules(activeUser.id, 'student');
@@ -54,25 +52,32 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
 
   const currentSchedule = activeSchedule || schedules[0];
 
-  const [realtimeAttendance, setRealtimeAttendance] = useState<AttendanceRecordItem | null>(null);
+  const attendanceSubKey =
+    currentSchedule?.id && activeUser?.id
+      ? `${currentSchedule.id}_${activeUser.id}`
+      : '';
+  const [attendanceState, setAttendanceState] = useState<{
+    key: string;
+    record: AttendanceRecordItem | null;
+  }>({ key: '', record: null });
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState<boolean>(false);
 
   // Berlangganan dokumen presensi mahasiswa di Cloud Firestore
   useEffect(() => {
-    if (!currentSchedule?.id || !activeUser?.id) {
+    if (!attendanceSubKey || !currentSchedule?.id || !activeUser?.id) {
       return undefined;
     }
+    const activeKey = attendanceSubKey;
     const unsubscribe = subscribeToStudentAttendanceForSchedule(
       currentSchedule.id,
       activeUser.id,
-      record => setRealtimeAttendance(record),
+      record => setAttendanceState({ key: activeKey, record }),
       err => console.warn('Attendance listener error:', err),
     );
     return () => {
       unsubscribe();
-      setRealtimeAttendance(null);
     };
-  }, [currentSchedule?.id, activeUser?.id]);
+  }, [attendanceSubKey, currentSchedule?.id, activeUser?.id]);
 
   const [feedbackModal, setFeedbackModal] = useState<{
     visible: boolean;
@@ -85,15 +90,14 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     message: '',
   });
 
-  const isAttended = Boolean(realtimeAttendance) || (
-    currentSchedule ? hasStudentAttended(currentSchedule.id, activeUser.id) : false
-  );
+  const studentRecord =
+    attendanceSubKey && attendanceState.key === attendanceSubKey
+      ? attendanceState.record
+      : null;
 
-  const studentRecord = realtimeAttendance || (
-    currentSchedule
-      ? getStudentAttendanceForSchedule(currentSchedule.id, activeUser.id)
-      : undefined
-  );
+  const isPresent = studentRecord?.status === 'Hadir';
+  const isExcused = studentRecord?.status === 'Izin';
+  const hasAttendanceRecord = isPresent || isExcused;
 
   const isSessionOpen = currentSchedule?.status === 'DIBUKA';
 
@@ -182,7 +186,7 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
           <Card
             style={[
               styles.mainCard,
-              isSessionOpen && !isAttended && styles.mainCardOpen,
+              isSessionOpen && !hasAttendanceRecord && styles.mainCardOpen,
             ]}>
             {/* Header: StatusBadge & Date */}
             <View style={styles.cardHeaderRow}>
@@ -198,7 +202,7 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
             </Text>
 
             {/* Live Indicator Banner */}
-            {isSessionOpen && !isAttended && (
+            {isSessionOpen && !hasAttendanceRecord && (
               <View style={styles.liveBanner}>
                 <View style={styles.pulsingDot} />
                 <Text style={styles.liveBannerText}>
@@ -211,8 +215,8 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
 
             {/* Attendance CTA Section */}
             <View style={styles.ctaContainer}>
-              {isAttended ? (
-                /* Kasus Sudah Presensi */
+              {isPresent ? (
+                /* Kasus Sudah Presensi Hadir */
                 <View style={styles.attendedBox}>
                   <View style={styles.attendedTitleRow}>
                     <Ionicons
@@ -229,6 +233,31 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
                   )}
                   <CustomButton
                     title="✓ Sudah Presensi"
+                    variant="outline"
+                    disabled
+                    size="md"
+                    onPress={() => {}}
+                    style={styles.attendedBtn}
+                  />
+                </View>
+              ) : isExcused ? (
+                /* Kasus Tercatat Izin (Pengajuan Izin Disetujui) */
+                <View style={styles.attendedBox}>
+                  <View style={styles.attendedTitleRow}>
+                    <Ionicons
+                      name="document-text"
+                      size={20}
+                      color={APP_COLORS.warning}
+                    />
+                    <Text style={styles.excusedTitle}>Izin Disetujui</Text>
+                  </View>
+                  {studentRecord && (
+                    <Text style={styles.timestampText}>
+                      Status kehadiran Anda tercatat sebagai Izin ({studentRecord.date} • {studentRecord.timestamp})
+                    </Text>
+                  )}
+                  <CustomButton
+                    title="✓ Tercatat Izin"
                     variant="outline"
                     disabled
                     size="md"
@@ -304,7 +333,7 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
             studentId={activeUser.id}
             studentName={activeUser.name}
             nim={activeUser.nim}
-            isAttended={isAttended && studentRecord?.status === 'Hadir'}
+            isAttended={isPresent}
             onNavigateToLeaveScreen={() =>
               navigation.navigate('LeaveRequest', {
                 scheduleId: currentSchedule.id,
@@ -533,9 +562,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: APP_COLORS.opened,
   },
+  excusedTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: APP_COLORS.warning,
+  },
   timestampText: {
     fontSize: 13,
     color: APP_COLORS.textSecondary,
+    textAlign: 'center',
     marginBottom: APP_SPACING.md,
   },
   attendedBtn: {

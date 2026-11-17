@@ -19,42 +19,49 @@ interface StudentHistoryState {
 export function useStudentAttendanceHistory(
   studentUid?: string,
 ): StudentHistoryState {
-  const [historyRecords, setHistoryRecords] = useState<AttendanceRecordItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const activeKey = studentUid?.trim() || '';
+  const [state, setState] = useState<{
+    key: string;
+    historyRecords: AttendanceRecordItem[];
+    error: string | null;
+  }>({
+    key: '',
+    historyRecords: [],
+    error: null,
+  });
 
   useEffect(() => {
-    if (!studentUid?.trim()) {
-      setHistoryRecords([]);
-      setLoading(false);
-      setError('UID praktikan belum tersedia. Silakan login terlebih dahulu.');
+    if (!activeKey) {
       return undefined;
     }
 
-    setLoading(true);
-    setError(null);
-
+    const targetKey = activeKey;
     const unsubscribe = subscribeToStudentHistory(
-      studentUid,
+      targetKey,
       records => {
-        setHistoryRecords(records);
-        setLoading(false);
-        setError(null);
+        setState({ key: targetKey, historyRecords: records, error: null });
       },
       err => {
-        setError(err);
-        setLoading(false);
+        setState({ key: targetKey, historyRecords: [], error: err });
       },
     );
 
     return () => {
       unsubscribe();
     };
-  }, [studentUid]);
+  }, [activeKey]);
+
+  if (!activeKey) {
+    return {
+      historyRecords: [],
+      loading: false,
+      error: 'UID praktikan belum tersedia. Silakan login terlebih dahulu.',
+    };
+  }
 
   return {
-    historyRecords,
-    loading,
-    error,
+    historyRecords: state.key === activeKey ? state.historyRecords : [],
+    loading: state.key !== activeKey,
+    error: state.key === activeKey ? state.error : null,
   };
 }

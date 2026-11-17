@@ -14,14 +14,17 @@ interface ParticipantRosterProps {
 }
 
 export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({ schedule }) => {
+  const enrolledKey = `${schedule.id}:${schedule.enrolledStudents.join('|')}`;
+  const [prevEnrolledKey, setPrevEnrolledKey] = useState(enrolledKey);
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [selected, setSelected] = useState<string[]>(schedule.enrolledStudents);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
+  if (prevEnrolledKey !== enrolledKey) {
+    setPrevEnrolledKey(enrolledKey);
     setSelected(schedule.enrolledStudents);
-  }, [schedule.id, schedule.enrolledStudents.join('|')]);
+  }
 
   useEffect(() => {
     let active = true;
