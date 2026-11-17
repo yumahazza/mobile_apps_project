@@ -17,6 +17,8 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { StatusBadge } from '@/components/StatusBadge';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { EmptyState } from '@/components/EmptyState';
+import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import {
@@ -28,7 +30,12 @@ import {
   StudentOption,
   updatePracticumSchedule,
 } from '@/services/practicumScheduleService';
-import { APP_COLORS, APP_SPACING } from '@/constants/theme';
+import {
+  APP_COLORS,
+  APP_FONTS,
+  APP_RADIUS,
+  APP_SPACING,
+} from '@/constants/theme';
 
 interface ScheduleScreenProps {
   navigation: NavigationProp;
@@ -76,7 +83,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
       .catch((err) =>
         Alert.alert(
           'Gagal memuat praktikan',
-          err.message || 'Periksa koneksi dan izin Firestore.',
+          err.message || 'Periksa koneksi dan izin akses.',
         ),
       )
       .finally(() => setLoadingStudents(false));
@@ -121,13 +128,13 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     try {
       if (editingSchedule) {
         await updatePracticumSchedule(editingSchedule.id, form);
-        Alert.alert('Berhasil', 'Jadwal praktikum berhasil diperbarui.');
+        Alert.alert('Berhasil', 'Jadwal berhasil diperbarui.');
       } else {
         await createPracticumSchedule(form, {
           uid: activeUser.id,
           name: activeUser.name,
         });
-        Alert.alert('Berhasil', 'Jadwal praktikum berhasil ditambahkan ke Firestore.');
+        Alert.alert('Berhasil', 'Jadwal baru berhasil dibuat.');
       }
       setModalVisible(false);
     } catch (err) {
@@ -144,7 +151,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     if (schedule.status === 'DIBUKA') {
       Alert.alert(
         'Jadwal sedang dibuka',
-        'Tutup sesi terlebih dahulu sebelum menghapus jadwal.',
+        'Tutup sesi terlebih dahulu sebelum menghapus.',
       );
       return;
     }
@@ -160,7 +167,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     } catch (err) {
       Alert.alert(
         'Gagal menghapus',
-        err instanceof Error ? err.message : 'Periksa izin Firestore.',
+        err instanceof Error ? err.message : 'Periksa izin akses.',
       );
     } finally {
       setDeleting(false);
@@ -171,72 +178,63 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
         title="Jadwal Praktikum"
-        subtitle={
-          isAssistant
-            ? 'Kelola sesi & peserta praktikum'
-            : 'Daftar sesi praktikum Anda'
-        }
+        subtitle={`${sortedSchedules.length} sesi terdaftar`}
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
+
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
         <View style={styles.headingRow}>
-          <View style={styles.headingCopy}>
-            <Text style={styles.heading}>Semua Sesi</Text>
-            <Text style={styles.subheading}>
-              {sortedSchedules.length} sesi terdaftar di Cloud Firestore
-            </Text>
-          </View>
+          <Text style={styles.heading}>Semua Sesi</Text>
           {isAssistant && (
-            <Pressable
-              style={({ pressed }) => [
-                styles.addPillButton,
-                pressed && styles.pressed,
-              ]}
-              onPress={openCreate}>
-              <Ionicons name="add" size={18} color="#FFFFFF" />
-              <Text style={styles.addPillButtonText}>Jadwal Baru</Text>
-            </Pressable>
+            <CustomButton
+              title="Jadwal Baru"
+              variant="primary"
+              size="sm"
+              fullWidth={false}
+              leftIcon={<Ionicons name="add" size={16} color={APP_COLORS.white} />}
+              onPress={openCreate}
+            />
           )}
         </View>
 
         {loading && (
           <View style={styles.stateBox}>
             <ActivityIndicator color={APP_COLORS.primary} />
-            <Text style={styles.stateText}>Memuat jadwal dari Firestore...</Text>
-          </View>
-        )}
-        {!!error && (
-          <View style={styles.errorBox}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={18}
-              color={APP_COLORS.error}
-            />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-        {!loading && !error && sortedSchedules.length === 0 && (
-          <View style={styles.stateBox}>
-            <Ionicons
-              name="calendar-outline"
-              size={34}
-              color={APP_COLORS.neutral400}
-            />
-            <Text style={styles.emptyTitle}>Belum ada jadwal</Text>
-            <Text style={styles.stateText}>
-              {isAssistant
-                ? 'Tekan tombol + Jadwal Baru untuk membuat sesi praktikum pertama.'
-                : 'Asisten belum mendaftarkan akunmu ke jadwal praktikum.'}
-            </Text>
+            <Text style={styles.stateText}>Memuat jadwal...</Text>
           </View>
         )}
 
+        {!!error && (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Jadwal"
+            description={error}
+          />
+        )}
+
+        {!loading && !error && sortedSchedules.length === 0 && (
+          <EmptyState
+            icon="calendar-outline"
+            title="Belum Ada Jadwal"
+            description={
+              isAssistant
+                ? 'Tambahkan sesi praktikum pertama Anda.'
+                : 'Belum ada jadwal untuk akun Anda.'
+            }
+          />
+        )}
+
         <View style={styles.list}>
-          {sortedSchedules.map((schedule) => (
-            <View key={schedule.id} style={styles.scheduleCard}>
+          {sortedSchedules.map((schedule, idx) => (
+            <View
+              key={schedule.id}
+              style={[
+                styles.scheduleCard,
+                idx % 2 === 1 && styles.scheduleCardTint,
+              ]}>
               <Pressable
                 onPress={() => {
                   setActiveScheduleId(schedule.id);
@@ -251,33 +249,21 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                   <StatusBadge status={schedule.status} size="sm" />
                 </View>
 
-                <View style={styles.chipsRow}>
-                  <View style={[styles.chip, styles.chipPurple]}>
-                    <Text style={styles.chipPurpleText}>
-                      {schedule.className}
-                    </Text>
-                  </View>
-                  <View style={[styles.chip, styles.chipBlue]}>
-                    <Text style={styles.chipBlueText}>{schedule.room}</Text>
-                  </View>
-                  <View style={[styles.chip, styles.chipGreen]}>
-                    <Text style={styles.chipGreenText}>
-                      {schedule.totalStudents} peserta
-                    </Text>
-                  </View>
-                </View>
+                <Text style={styles.metaText} numberOfLines={1}>
+                  {schedule.className} · {schedule.room} · {schedule.totalStudents} peserta
+                </Text>
 
                 <View style={styles.cardBottomRow}>
                   <View style={styles.dateRow}>
                     <Ionicons
                       name="calendar-outline"
                       size={14}
-                      color="#475569"
+                      color={APP_COLORS.textSecondary}
                     />
                     <Text style={styles.dateText}>{schedule.date}</Text>
                   </View>
-                  <View style={styles.darkTimeBadge}>
-                    <Text style={styles.darkTimeText}>{schedule.time}</Text>
+                  <View style={styles.timeBadge}>
+                    <Text style={styles.timeText}>{schedule.time}</Text>
                   </View>
                 </View>
               </Pressable>
@@ -293,9 +279,9 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                     <Ionicons
                       name="create-outline"
                       size={15}
-                      color="#0F172A"
+                      color={APP_COLORS.inkPrimary}
                     />
-                    <Text style={styles.editText}>Ubah Jadwal</Text>
+                    <Text style={styles.editText}>Ubah</Text>
                   </Pressable>
                   <Pressable
                     style={({ pressed }) => [
@@ -306,7 +292,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                     <Ionicons
                       name="trash-outline"
                       size={15}
-                      color={APP_COLORS.error}
+                      color={APP_COLORS.dangerText}
                     />
                     <Text style={styles.deleteText}>Hapus</Text>
                   </Pressable>
@@ -326,13 +312,15 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingSchedule ? 'Ubah Jadwal' : 'Buat Jadwal Baru'}
+                {editingSchedule ? 'Ubah Jadwal' : 'Jadwal Baru'}
               </Text>
               <Pressable
                 onPress={() => setModalVisible(false)}
                 hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Tutup"
                 style={styles.closeCircleBtn}>
-                <Ionicons name="close" size={20} color="#0F172A" />
+                <Ionicons name="close" size={20} color={APP_COLORS.inkPrimary} />
               </Pressable>
             </View>
             <ScrollView
@@ -373,7 +361,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                 <ActivityIndicator color={APP_COLORS.primary} />
               ) : students.length === 0 ? (
                 <Text style={styles.stateText}>
-                  Belum ada profil praktikan dengan role student.
+                  Belum ada akun praktikan terdaftar.
                 </Text>
               ) : (
                 students.map((student) => {
@@ -389,7 +377,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                       <Ionicons
                         name={selected ? 'checkbox' : 'square-outline'}
                         size={20}
-                        color={selected ? '#0F172A' : APP_COLORS.neutral400}
+                        color={selected ? APP_COLORS.primary : APP_COLORS.neutral400}
                       />
                       <View style={styles.studentChoiceCopy}>
                         <Text style={styles.studentChoiceName}>
@@ -406,18 +394,15 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
               <Text style={styles.selectionHint}>
                 {form.enrolledStudents.length} peserta dipilih
               </Text>
-              <Pressable
-                style={[styles.saveButton, saving && styles.disabledButton]}
+              <CustomButton
+                title={editingSchedule ? 'Simpan Perubahan' : 'Simpan Jadwal'}
+                variant="primary"
+                size="lg"
+                loading={saving}
                 disabled={saving}
-                onPress={saveSchedule}>
-                {saving ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveButtonText}>
-                    {editingSchedule ? 'Simpan Perubahan' : 'Simpan Jadwal'}
-                  </Text>
-                )}
-              </Pressable>
+                onPress={saveSchedule}
+                style={styles.saveButton}
+              />
             </ScrollView>
           </View>
         </View>
@@ -426,13 +411,13 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
       <ConfirmModal
         visible={Boolean(deleteTarget)}
         title="Hapus Jadwal?"
-        subtitle="Jadwal praktikum yang dihapus tidak dapat dipulihkan kembali."
+        subtitle="Jadwal yang dihapus tidak dapat dipulihkan."
         details={
           deleteTarget
             ? {
                 courseName: deleteTarget.courseName,
                 className: deleteTarget.className,
-                time: `${deleteTarget.date} • ${deleteTarget.time}`,
+                time: `${deleteTarget.date} · ${deleteTarget.time}`,
                 room: deleteTarget.room,
               }
             : undefined
@@ -478,108 +463,56 @@ const FormField: React.FC<{
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F5F6FA',
+    backgroundColor: APP_COLORS.background,
   },
   content: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.sm,
-    paddingBottom: 36,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   headingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  headingCopy: {
-    flex: 1,
-    marginRight: 8,
+    marginBottom: APP_SPACING.md,
   },
   heading: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  subheading: {
-    marginTop: 2,
-    color: '#64748B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  addPillButton: {
-    backgroundColor: '#4F46E5',
-    borderRadius: 999,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-  },
-  addPillButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 12,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 17,
+    color: APP_COLORS.inkPrimary,
   },
   list: {
-    gap: 12,
+    gap: APP_SPACING.sm,
   },
   scheduleCard: {
-    padding: 16,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
+    padding: APP_SPACING.lg,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  scheduleCardTint: {
+    backgroundColor: APP_COLORS.nordicBreeze,
+    borderColor: APP_COLORS.nordicBreeze,
   },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 10,
+    marginBottom: 4,
   },
   courseTitle: {
     flex: 1,
-    fontSize: 17,
-    color: '#0F172A',
-    fontWeight: '900',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 15,
+    color: APP_COLORS.inkPrimary,
   },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  chipPurple: {
-    backgroundColor: '#F3E8FF',
-  },
-  chipPurpleText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#6B21A8',
-  },
-  chipBlue: {
-    backgroundColor: '#DBEAFE',
-  },
-  chipBlueText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#1E40AF',
-  },
-  chipGreen: {
-    backgroundColor: '#DCFCE7',
-  },
-  chipGreenText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#166534',
+  metaText: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+    marginBottom: APP_SPACING.sm,
   },
   cardBottomRow: {
     flexDirection: 'row',
@@ -592,28 +525,28 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dateText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
+    color: APP_COLORS.textSecondary,
   },
-  darkTimeBadge: {
-    backgroundColor: '#181824',
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 10,
+  timeBadge: {
+    backgroundColor: APP_COLORS.surfaceSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.sm,
   },
-  darkTimeText: {
+  timeText: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    color: APP_COLORS.inkPrimary,
   },
   actionRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 14,
+    marginTop: APP_SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    paddingTop: 12,
+    borderTopColor: APP_COLORS.divider,
+    paddingTop: APP_SPACING.md,
   },
   editButton: {
     flex: 1,
@@ -621,104 +554,76 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 9,
-    borderRadius: 999,
-    backgroundColor: '#C7D2FE',
-    borderWidth: 1,
-    borderColor: '#0F172A',
+    minHeight: 40,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.softBlue,
   },
   editText: {
-    color: '#0F172A',
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.inkPrimary,
     fontSize: 12,
-    fontWeight: '800',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+    minHeight: 40,
+    paddingHorizontal: 16,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.dangerSoft,
   },
   deleteText: {
-    color: APP_COLORS.error,
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.dangerText,
     fontSize: 12,
-    fontWeight: '800',
   },
   stateBox: {
     alignItems: 'center',
-    padding: 26,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-    gap: 9,
-    marginBottom: 14,
+    padding: APP_SPACING.xl,
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    gap: 8,
+    marginBottom: APP_SPACING.md,
   },
   stateText: {
-    color: '#475569',
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: APP_FONTS.medium,
+    color: APP_COLORS.textSecondary,
+    fontSize: 13,
     textAlign: 'center',
-    lineHeight: 18,
-  },
-  emptyTitle: {
-    color: '#0F172A',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  errorBox: {
-    flexDirection: 'row',
-    gap: 8,
-    padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    marginBottom: 14,
-  },
-  errorText: {
-    flex: 1,
-    color: APP_COLORS.error,
-    fontSize: 12,
-    lineHeight: 18,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.58)',
+    backgroundColor: 'rgba(23, 24, 75, 0.5)',
     justifyContent: 'flex-end',
   },
   modalCard: {
     maxHeight: '90%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    backgroundColor: '#FDFBF7',
-    padding: 20,
-    borderTopWidth: 2,
-    borderColor: '#0F172A',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: APP_COLORS.background,
+    padding: APP_SPACING.xl,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: APP_SPACING.md,
   },
   modalTitle: {
-    fontSize: 20,
-    color: '#0F172A',
-    fontWeight: '900',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 19,
+    color: APP_COLORS.inkPrimary,
   },
   closeCircleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFFFFF',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: APP_COLORS.white,
     borderWidth: 1,
-    borderColor: '#0F172A',
+    borderColor: APP_COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -726,21 +631,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   fieldLabel: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 12,
-    color: '#334155',
-    fontWeight: '800',
+    color: APP_COLORS.inkPrimary,
     marginBottom: 6,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-    borderRadius: 14,
+    fontFamily: APP_FONTS.regular,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    borderRadius: APP_RADIUS.md,
     paddingHorizontal: 14,
     paddingVertical: 11,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
+    color: APP_COLORS.inkPrimary,
+    backgroundColor: APP_COLORS.white,
+    fontSize: 14,
   },
   studentChoice: {
     flexDirection: 'row',
@@ -748,51 +653,40 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     gap: 10,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.white,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: APP_COLORS.border,
     marginBottom: 6,
   },
   studentChoiceSelected: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#0F172A',
+    backgroundColor: APP_COLORS.softBlue,
+    borderColor: APP_COLORS.primary,
   },
   studentChoiceCopy: {
     flex: 1,
   },
   studentChoiceName: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    color: '#0F172A',
-    fontWeight: '800',
+    color: APP_COLORS.inkPrimary,
   },
   studentChoiceMeta: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
+    color: APP_COLORS.textSecondary,
+    marginTop: 1,
   },
   selectionHint: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
+    color: APP_COLORS.textSecondary,
     marginTop: 6,
     marginBottom: 10,
   },
   saveButton: {
-    backgroundColor: '#0F172A',
-    borderRadius: 999,
-    paddingVertical: 15,
-    alignItems: 'center',
     marginTop: 6,
-    marginBottom: 12,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  disabledButton: {
-    opacity: 0.6,
+    marginBottom: 16,
   },
   pressed: {
     opacity: 0.78,

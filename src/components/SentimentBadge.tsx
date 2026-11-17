@@ -1,13 +1,12 @@
 /**
- * Lintang — SentimentBadge Component
+ * SentimentBadge Component
  * Menampilkan label sentimen AI (Positif, Negatif, Netral, Tidak Terklasifikasi)
- * dengan warna dan ikon yang konsisten dengan tema Sprint 1.
  */
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { SentimentLabel } from '@/types/attendance';
-import { APP_RADIUS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS } from '@/constants/theme';
 
 interface SentimentBadgeProps {
   sentiment: SentimentLabel;
@@ -20,30 +19,30 @@ export const SentimentBadge: React.FC<SentimentBadgeProps> = ({
   size = 'md',
   style,
 }) => {
-  let backgroundColor = '#F1F5F9';
-  let textColor = '#475569';
+  let backgroundColor: string = APP_COLORS.neutral100;
+  let textColor: string = APP_COLORS.textSecondary;
   let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'chatbubble-ellipses-outline';
 
   switch (sentiment) {
     case 'Positif':
-      backgroundColor = '#DCFCE7';
-      textColor = '#16A34A';
+      backgroundColor = APP_COLORS.openedSoft;
+      textColor = APP_COLORS.opened;
       iconName = 'happy-outline';
       break;
     case 'Negatif':
-      backgroundColor = '#FEE2E2';
-      textColor = '#DC2626';
+      backgroundColor = APP_COLORS.dangerSoft;
+      textColor = APP_COLORS.dangerText;
       iconName = 'sad-outline';
       break;
     case 'Netral':
-      backgroundColor = '#E0F2FE';
-      textColor = '#0284C7';
+      backgroundColor = APP_COLORS.softBlue;
+      textColor = APP_COLORS.primary;
       iconName = 'remove-circle-outline';
       break;
     case 'Tidak Terklasifikasi':
     default:
-      backgroundColor = '#FEF3C7';
-      textColor = '#D97706';
+      backgroundColor = APP_COLORS.notOpenedSoft;
+      textColor = APP_COLORS.notOpened;
       iconName = 'help-circle-outline';
       break;
   }
@@ -56,7 +55,7 @@ export const SentimentBadge: React.FC<SentimentBadgeProps> = ({
         styles.container,
         {
           backgroundColor,
-          paddingVertical: isSmall ? 3 : 5,
+          paddingVertical: isSmall ? 4 : 5,
           paddingHorizontal: isSmall ? 8 : 10,
         },
         style,
@@ -85,8 +84,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   text: {
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontFamily: APP_FONTS.bold,
+    letterSpacing: 0.2,
   },
 });
 

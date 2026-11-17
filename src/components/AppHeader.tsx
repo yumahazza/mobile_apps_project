@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { APP_COLORS, APP_SPACING } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_SPACING } from '@/constants/theme';
 
 export interface AppHeaderProps {
   title?: string;
@@ -20,7 +20,7 @@ export interface AppHeaderProps {
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
-  title = 'PPK',
+  title = '',
   onBack,
   onNotificationPress,
   hasUnreadNotifications = true,
@@ -31,32 +31,30 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     <View style={styles.headerWrapper}>
       <StatusBar style="dark" />
       <View style={styles.headerContent}>
-        {/* Left: Back button or Brand Pill */}
-        <View style={styles.leftContainer}>
-          {onBack ? (
-            <Pressable
-              onPress={onBack}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Kembali"
-              style={({ pressed }) => [
-                styles.circleButton,
-                pressed && styles.pressed,
-              ]}>
-              <Ionicons name="chevron-back" size={20} color="#0F172A" />
-            </Pressable>
-          ) : (
-            <View style={styles.brandBadge}>
-              <Ionicons name="layers" size={18} color="#4F46E5" />
-            </View>
-          )}
-        </View>
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+            style={({ pressed }) => [
+              styles.circleButton,
+              pressed && styles.pressed,
+            ]}>
+            <Ionicons name="chevron-back" size={20} color={APP_COLORS.inkPrimary} />
+          </Pressable>
+        ) : null}
 
-        {/* Center: Title & Optional Subtitle */}
-        <View style={styles.centerContainer}>
-          <Text style={styles.titleText} numberOfLines={1}>
-            {title}
-          </Text>
+        <View
+          style={[
+            styles.titleContainer,
+            !onBack && styles.titleContainerFlush,
+          ]}>
+          {title ? (
+            <Text style={styles.titleText} numberOfLines={1}>
+              {title}
+            </Text>
+          ) : null}
           {subtitle ? (
             <Text style={styles.subtitleText} numberOfLines={1}>
               {subtitle}
@@ -64,7 +62,6 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           ) : null}
         </View>
 
-        {/* Right: Notification bell or custom action */}
         <View style={styles.rightContainer}>
           {rightAction ? (
             rightAction
@@ -78,7 +75,11 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
                 styles.circleButton,
                 pressed && styles.pressed,
               ]}>
-              <Ionicons name="notifications-outline" size={20} color="#0F172A" />
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color={APP_COLORS.inkPrimary}
+              />
               {hasUnreadNotifications && <View style={styles.notificationDot} />}
             </Pressable>
           ) : (
@@ -92,7 +93,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
 
 const styles = StyleSheet.create({
   headerWrapper: {
-    backgroundColor: '#F6F7FB',
+    backgroundColor: APP_COLORS.background,
     width: '100%',
     paddingTop: Platform.OS === 'ios' ? 6 : 10,
     paddingBottom: 10,
@@ -103,73 +104,61 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     minHeight: 46,
+    gap: APP_SPACING.md,
   },
-  leftContainer: {
-    width: 46,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  brandBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: '#E0E7FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerContainer: {
+  titleContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: APP_SPACING.sm,
+  },
+  titleContainerFlush: {
+    paddingLeft: 2,
   },
   titleText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: APP_COLORS.inkPrimary,
     letterSpacing: -0.2,
-    textAlign: 'center',
   },
   subtitleText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    textAlign: 'center',
+    lineHeight: 16,
+    color: APP_COLORS.textSecondary,
+    marginTop: 1,
   },
   rightContainer: {
-    width: 46,
+    minWidth: 44,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
   circleButton: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: APP_COLORS.border,
   },
   pressed: {
     opacity: 0.72,
   },
   notificationDot: {
     position: 'absolute',
-    top: 10,
+    top: 11,
     right: 11,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F43F5E',
+    backgroundColor: APP_COLORS.danger,
     borderWidth: 1.5,
     borderColor: APP_COLORS.white,
   },
   placeholder: {
-    width: 42,
-    height: 42,
+    width: 44,
+    height: 44,
   },
 });
 

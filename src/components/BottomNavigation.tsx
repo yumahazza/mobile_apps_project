@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { APP_COLORS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS } from '@/constants/theme';
 import { UserRole } from '@/data/users';
 
 export interface TabItem {
@@ -30,7 +30,6 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   onTabChange,
 }) => {
   const insets = useSafeAreaInsets();
-  // Pastikan jarak bawah selalu aman dari navigation bar bawaan Android (3-button maupun gesture nav)
   const bottomClearance = Math.max(
     insets.bottom,
     Platform.OS === 'android' ? 24 : 12,
@@ -40,8 +39,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     {
       key: 'AssistantHome',
       label: 'Beranda',
-      iconName: 'grid-outline',
-      activeIconName: 'grid',
+      iconName: 'home-outline',
+      activeIconName: 'home',
     },
     {
       key: 'SessionRecap',
@@ -96,7 +95,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     <View
       style={[
         styles.dockWrapper,
-        { paddingBottom: bottomClearance + 6 },
+        { paddingBottom: bottomClearance + 4 },
       ]}>
       <View style={styles.floatingDock}>
         {tabs.map((tab) => {
@@ -108,12 +107,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               key={tab.key}
               onPress={() => onTabChange(tab.key)}
               hitSlop={6}
+              android_ripple={{ color: 'transparent' }}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={tab.label}
               style={({ pressed }) => [
                 styles.tabButton,
-                isActive && styles.tabButtonActive,
                 pressed && styles.pressed,
               ]}>
               <View
@@ -124,7 +123,11 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                 <Ionicons
                   name={icon}
                   size={20}
-                  color={isActive ? '#0F172A' : '#CBD5E1'}
+                  color={
+                    isActive
+                      ? APP_COLORS.tetsuKon
+                      : APP_COLORS.navbarInactive
+                  }
                 />
               </View>
               <Text
@@ -145,60 +148,51 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
 const styles = StyleSheet.create({
   dockWrapper: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingTop: 8,
-    backgroundColor: 'transparent',
+    backgroundColor: APP_COLORS.background,
   },
   floatingDock: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#181824',
-    borderRadius: 34,
-    paddingVertical: 7,
+    backgroundColor: APP_COLORS.navbarDock,
+    borderRadius: 28,
+    paddingVertical: 8,
     paddingHorizontal: 10,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    elevation: 10,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 50,
-    borderRadius: 26,
-    paddingVertical: 4,
+    minHeight: 48,
+    paddingVertical: 2,
     paddingHorizontal: 4,
   },
-  tabButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.10)',
-  },
   iconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.06)',
+    backgroundColor: 'transparent',
   },
   iconCircleActive: {
-    backgroundColor: '#A5F3FC',
+    backgroundColor: APP_COLORS.navbarTosca,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#94A3B8',
+    fontFamily: APP_FONTS.medium,
+    fontSize: 11,
+    lineHeight: 14,
+    color: APP_COLORS.navbarInactive,
     marginTop: 3,
-    letterSpacing: 0.2,
   },
   activeTabLabel: {
-    color: APP_COLORS.white,
-    fontWeight: '700',
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.navbarTosca,
   },
   pressed: {
-    opacity: 0.8,
+    opacity: 0.78,
   },
 });
 

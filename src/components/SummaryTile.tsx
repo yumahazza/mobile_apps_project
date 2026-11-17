@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { APP_COLORS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
 
 export interface SummaryMetricsProps {
   hadir: number;
@@ -17,28 +17,24 @@ export const SummaryTile: React.FC<SummaryMetricsProps> = ({
 }) => {
   return (
     <View style={styles.grid}>
-      {/* Tile Hadir */}
       <View style={[styles.tile, styles.tileHadir]}>
-        <Text style={[styles.label, { color: APP_COLORS.success }]}>Hadir</Text>
-        <Text style={[styles.value, { color: APP_COLORS.success }]}>{hadir}</Text>
+        <Text style={[styles.label, { color: APP_COLORS.opened }]}>Hadir</Text>
+        <Text style={[styles.value, { color: APP_COLORS.opened }]}>{hadir}</Text>
       </View>
 
-      {/* Tile Izin */}
       <View style={[styles.tile, styles.tileIzin]}>
         <Text style={[styles.label, { color: APP_COLORS.warning }]}>Izin</Text>
         <Text style={[styles.value, { color: APP_COLORS.warning }]}>{izin}</Text>
       </View>
 
-      {/* Tile Alfa */}
       <View style={[styles.tile, styles.tileAlfa]}>
-        <Text style={[styles.label, { color: APP_COLORS.danger }]}>Alfa</Text>
-        <Text style={[styles.value, { color: APP_COLORS.danger }]}>{alfa}</Text>
+        <Text style={[styles.label, { color: APP_COLORS.dangerText }]}>Alfa</Text>
+        <Text style={[styles.value, { color: APP_COLORS.dangerText }]}>{alfa}</Text>
       </View>
 
-      {/* Tile Total */}
       <View style={[styles.tile, styles.tileTotal]}>
         <Text style={[styles.label, { color: APP_COLORS.textSecondary }]}>Total</Text>
-        <Text style={[styles.value, { color: APP_COLORS.navyHeading }]}>{total}</Text>
+        <Text style={[styles.value, { color: APP_COLORS.inkPrimary }]}>{total}</Text>
       </View>
     </View>
   );
@@ -63,29 +59,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tileHadir: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#DCFCE7',
+    backgroundColor: APP_COLORS.openedSoft,
+    borderColor: '#BBF7D0',
   },
   tileIzin: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#FEF3C7',
+    backgroundColor: APP_COLORS.notOpenedSoft,
+    borderColor: '#FDE68A',
   },
   tileAlfa: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FEE2E2',
+    backgroundColor: APP_COLORS.dangerSoft,
+    borderColor: '#FECACA',
   },
   tileTotal: {
     backgroundColor: APP_COLORS.white,
     borderColor: APP_COLORS.border,
   },
   label: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
     marginBottom: 4,
   },
   value: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 18,
   },
 });
 

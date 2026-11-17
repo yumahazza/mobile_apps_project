@@ -25,9 +25,11 @@ import { CustomButton } from '@/components/CustomButton';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { DonutChart } from '@/components/DonutChart';
+import { EmptyState } from '@/components/EmptyState';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -48,9 +50,8 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
     useFirestoreSchedules(activeUser.id, activeRole);
   const targetScheduleId = navigation.params?.scheduleId || activeScheduleId;
   const currentSchedule =
-    schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
+    schedules.find((schedule) => schedule.id === targetScheduleId) || schedules[0];
 
-  // Presensi & statistik real-time dari Firestore
   const { stats } = useRealtimeAttendance(
     currentSchedule?.id,
     currentSchedule?.totalStudents ?? 0,
@@ -67,15 +68,20 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   const [submittingAttendance, setSubmittingAttendance] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!attendanceSubKey || !currentSchedule?.id || activeRole !== 'student' || !activeUser?.id) {
+    if (
+      !attendanceSubKey ||
+      !currentSchedule?.id ||
+      activeRole !== 'student' ||
+      !activeUser?.id
+    ) {
       return undefined;
     }
     const activeKey = attendanceSubKey;
     const unsubscribe = subscribeToStudentAttendanceForSchedule(
       currentSchedule.id,
       activeUser.id,
-      record => setAttendanceState({ key: activeKey, record }),
-      err => console.warn('Attendance listener error:', err),
+      (record) => setAttendanceState({ key: activeKey, record }),
+      (err) => console.warn('Attendance listener error:', err),
     );
     return () => unsubscribe();
   }, [attendanceSubKey, currentSchedule?.id, activeUser?.id, activeRole]);
@@ -98,7 +104,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
         studentName: activeUser.name,
         nim: activeUser.nim,
       });
-      Alert.alert('Presensi Berhasil!', res.message, [
+      Alert.alert('Presensi Berhasil', res.message, [
         {
           text: 'OK',
           onPress: () => navigation.navigate('StudentHome'),
@@ -107,7 +113,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
     } catch (err) {
       Alert.alert(
         'Presensi Gagal',
-        err instanceof Error ? err.message : 'Presensi gagal dicatat ke Firestore.',
+        err instanceof Error ? err.message : 'Presensi gagal dicatat.',
       );
     } finally {
       setSubmittingAttendance(false);
@@ -119,12 +125,18 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <AppHeader title="Detail Sesi" onBack={() => navigation.goBack()} />
         <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>
-            {schedulesLoading ? 'Memuat detail sesi...' : 'Detail sesi tidak tersedia'}
-          </Text>
-          <Text style={styles.emptyDescription}>
-            {schedulesError || 'Jadwal tidak ditemukan atau akunmu tidak terdaftar sebagai peserta.'}
-          </Text>
+          <EmptyState
+            icon="calendar-outline"
+            title={
+              schedulesLoading
+                ? 'Memuat Detail Sesi'
+                : 'Detail Sesi Tidak Tersedia'
+            }
+            description={
+              schedulesError ||
+              'Jadwal tidak ditemukan atau akun Anda belum terdaftar.'
+            }
+          />
         </View>
       </SafeAreaView>
     );
@@ -132,9 +144,9 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Detail Sesi"
+        subtitle={`${currentSchedule.courseName} · ${currentSchedule.className}`}
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -142,72 +154,62 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Main Session Banner Card */}
-        {currentSchedule && (
-          <Card style={styles.topCard}>
-            <View style={styles.topCardRow}>
-              <View style={styles.courseInfoGroup}>
-                <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
-                <Text style={styles.courseMeta}>
-                  {currentSchedule.date} • {currentSchedule.time}
-                </Text>
-              </View>
-              <StatusBadge status={currentSchedule.status} size="sm" />
+        {/* Hero Session Banner (#273287 + #D8E63C) */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.classPill}>
+              <Text style={styles.classPillText}>
+                {currentSchedule.className}
+              </Text>
             </View>
-          </Card>
-        )}
-
-        {/* Info Rows Cards */}
-        {currentSchedule && (
-          <View style={styles.infoSection}>
-            {/* Ruang */}
-            <Card style={styles.infoRowCard}>
-              <View style={styles.infoRowContent}>
-                <View style={styles.infoIconBox}>
-                  <Ionicons name="business" size={18} color={APP_COLORS.primary} />
-                </View>
-                <View style={styles.infoTextCol}>
-                  <Text style={styles.infoLabel}>Ruang</Text>
-                  <Text style={styles.infoValue}>{currentSchedule.room}</Text>
-                </View>
-              </View>
-            </Card>
-
-            {/* Dosen / Asisten */}
-            <Card style={styles.infoRowCard}>
-              <View style={styles.infoRowContent}>
-                <View style={styles.infoIconBox}>
-                  <Ionicons name="person" size={18} color={APP_COLORS.primary} />
-                </View>
-                <View style={styles.infoTextCol}>
-                  <Text style={styles.infoLabel}>
-                    {activeRole === 'assistant' ? 'Asisten Pengampu' : 'Dosen / Asisten'}
-                  </Text>
-                  <Text style={styles.infoValue}>
-                    {currentSchedule.assistantName || 'Pak Budi'}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-
-            {/* Jumlah Mahasiswa */}
-            <Card style={styles.infoRowCard}>
-              <View style={styles.infoRowContent}>
-                <View style={styles.infoIconBox}>
-                  <Ionicons name="people" size={18} color={APP_COLORS.primary} />
-                </View>
-                <View style={styles.infoTextCol}>
-                  <Text style={styles.infoLabel}>Jumlah Mahasiswa</Text>
-                  <Text style={styles.infoValue}>{stats.totalRegistered}</Text>
-                </View>
-              </View>
-            </Card>
+            <StatusBadge status={currentSchedule.status} size="sm" />
           </View>
-        )}
+          <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
+          <Text style={styles.courseMeta}>
+            {currentSchedule.date} · {currentSchedule.time}
+          </Text>
+        </View>
 
-        {/* Persentase Kehadiran Section */}
+        {/* Info dalam 1 Panel Putih Bersekat Tipis */}
+        <View style={styles.infoPanel}>
+          <View style={[styles.infoRow, styles.infoRowDivider]}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="business-outline" size={18} color={APP_COLORS.primary} />
+            </View>
+            <View style={styles.infoTextCol}>
+              <Text style={styles.infoLabel}>Ruang</Text>
+              <Text style={styles.infoValue}>{currentSchedule.room}</Text>
+            </View>
+          </View>
+
+          <View style={[styles.infoRow, styles.infoRowDivider]}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="person-outline" size={18} color={APP_COLORS.primary} />
+            </View>
+            <View style={styles.infoTextCol}>
+              <Text style={styles.infoLabel}>
+                {activeRole === 'assistant' ? 'Asisten' : 'Asisten Pengampu'}
+              </Text>
+              <Text style={styles.infoValue}>
+                {currentSchedule.assistantName || '-'}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.infoRow}>
+            <View style={styles.infoIconBox}>
+              <Ionicons name="people-outline" size={18} color={APP_COLORS.primary} />
+            </View>
+            <View style={styles.infoTextCol}>
+              <Text style={styles.infoLabel}>Jumlah Peserta</Text>
+              <Text style={styles.infoValue}>{stats.totalRegistered}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Persentase Kehadiran */}
         <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Persentase Kehadiran</Text>
+          <Text style={styles.sectionTitle}>Kehadiran Sesi</Text>
           <Card style={styles.chartCard}>
             <DonutChart
               percentage={stats.attendancePercentage}
@@ -218,8 +220,8 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
           </Card>
         </View>
 
-        {/* Pengajuan Izin & Status Izin Real-time (Khusus Praktikan - Fritz) */}
-        {activeRole === 'student' && currentSchedule && (
+        {/* Pengajuan Izin (Praktikan) */}
+        {activeRole === 'student' && (
           <LeaveRequestSection
             scheduleId={currentSchedule.id}
             courseName={currentSchedule.courseName}
@@ -237,7 +239,7 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
           />
         )}
 
-        {/* Status Kehadiran Praktikan (Hadir / Izin) */}
+        {/* Status Kehadiran Praktikan */}
         {activeRole === 'student' && hasAttendanceRecord && studentAttendance && (
           <Card style={styles.attendanceStatusCard}>
             <View style={styles.attendanceStatusRow}>
@@ -252,20 +254,18 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
                     styles.attendanceStatusTitle,
                     { color: isPresent ? APP_COLORS.opened : APP_COLORS.warning },
                   ]}>
-                  {isPresent ? 'Anda Sudah Melakukan Presensi' : 'Status Kehadiran: Izin Disetujui'}
+                  {isPresent ? 'Tercatat Hadir' : 'Tercatat Izin'}
                 </Text>
                 <Text style={styles.attendanceStatusSub}>
-                  {isPresent
-                    ? `Tercatat Hadir pada ${studentAttendance.timestamp}`
-                    : `Tercatat Izin pada ${studentAttendance.date} • ${studentAttendance.timestamp}`}
+                  {studentAttendance.date} · {studentAttendance.timestamp}
                 </Text>
               </View>
             </View>
           </Card>
         )}
 
-        {/* Form Pesan & Kesan setelah praktikum SELESAI (Khusus Praktikan) */}
-        {activeRole === 'student' && currentSchedule && (
+        {/* Pesan & Kesan (Praktikan) */}
+        {activeRole === 'student' && (
           <FeedbackSection
             scheduleId={currentSchedule.id}
             isSessionFinished={currentSchedule.status === 'SELESAI'}
@@ -277,68 +277,59 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           {activeRole === 'assistant' && (
-            <CustomButton
-              title="Lihat Daftar Mahasiswa"
-              variant="primary"
-              size="lg"
-              onPress={() =>
-                navigation.navigate('StudentList', {
-                  scheduleId: currentSchedule?.id,
-                })
-              }
-            />
+            <>
+              <CustomButton
+                title="Daftar Mahasiswa"
+                variant="primary"
+                size="lg"
+                onPress={() =>
+                  navigation.navigate('StudentList', {
+                    scheduleId: currentSchedule.id,
+                  })
+                }
+              />
+              <CustomButton
+                title="Kontrol Sesi"
+                variant="secondary"
+                size="lg"
+                onPress={() =>
+                  navigation.navigate('SessionControl', {
+                    scheduleId: currentSchedule.id,
+                  })
+                }
+              />
+              <CustomButton
+                title="Review Pengajuan Izin"
+                variant="outline"
+                size="lg"
+                onPress={() =>
+                  navigation.navigate('LeaveApproval', {
+                    scheduleId: currentSchedule.id,
+                  })
+                }
+              />
+            </>
           )}
 
-          {/* If Assistant: button to Kontrol Sesi */}
-          {activeRole === 'assistant' && (
-            <CustomButton
-              title="Buka / Kontrol Sesi"
-              variant="secondary"
-              size="lg"
-              style={styles.extraBtn}
-              onPress={() =>
-                navigation.navigate('SessionControl', {
-                  scheduleId: currentSchedule?.id,
-                })
-              }
-            />
-          )}
-
-          {/* If Assistant: button to Pemeriksaan Izin (Manual Review Asisten) */}
-          {activeRole === 'assistant' && (
-            <CustomButton
-              title="Review Pengajuan Izin Praktikan"
-              variant="outline"
-              size="lg"
-              style={styles.extraBtn}
-              onPress={() =>
-                navigation.navigate('LeaveApproval', {
-                  scheduleId: currentSchedule?.id,
-                })
-              }
-            />
-          )}
-
-          {/* If Student & Session Open & not attended: Presensi Sekarang */}
-          {activeRole === 'student' && currentSchedule?.status === 'DIBUKA' && !hasAttendanceRecord && (
-            <CustomButton
-              title={submittingAttendance ? 'Mencatat Kehadiran...' : 'Presensi Sekarang'}
-              variant="primary"
-              size="lg"
-              disabled={submittingAttendance}
-              style={styles.extraBtn}
-              leftIcon={
-                submittingAttendance ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : undefined
-              }
-              onPress={handleStudentAttendance}
-            />
-          )}
+          {activeRole === 'student' &&
+            currentSchedule.status === 'DIBUKA' &&
+            !hasAttendanceRecord && (
+              <CustomButton
+                title={submittingAttendance ? 'Mencatat...' : 'Presensi Sekarang'}
+                variant="primary"
+                size="lg"
+                disabled={submittingAttendance}
+                leftIcon={
+                  submittingAttendance ? (
+                    <ActivityIndicator size="small" color={APP_COLORS.white} />
+                  ) : undefined
+                }
+                onPress={handleStudentAttendance}
+              />
+            )}
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab="ScheduleList"
@@ -355,55 +346,66 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
-  topCard: {
-    padding: APP_SPACING.lg,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+  heroCard: {
+    padding: APP_SPACING.xl,
+    borderRadius: APP_RADIUS.hero,
+    backgroundColor: APP_COLORS.intergalactic,
     marginBottom: APP_SPACING.md,
   },
-  topCardRow: {
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: APP_SPACING.md,
   },
-  courseInfoGroup: {
-    flex: 1,
-    paddingRight: APP_SPACING.sm,
+  classPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.pill,
+  },
+  classPillText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.white,
   },
   courseName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: APP_COLORS.durantaYellow,
     marginBottom: 4,
   },
   courseMeta: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.88)',
   },
-  infoSection: {
-    gap: APP_SPACING.sm,
-    marginBottom: APP_SPACING.lg,
-  },
-  infoRowCard: {
-    padding: APP_SPACING.md,
-    borderRadius: APP_RADIUS.card,
+  infoPanel: {
     backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
+    marginBottom: APP_SPACING.lg,
+    overflow: 'hidden',
   },
-  infoRowContent: {
+  infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: APP_SPACING.lg,
+  },
+  infoRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: APP_COLORS.divider,
   },
   infoIconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: APP_COLORS.softBlue,
     alignItems: 'center',
     justifyContent: 'center',
@@ -413,22 +415,23 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoLabel: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
-    marginBottom: 2,
   },
   infoValue: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
+    marginTop: 1,
   },
   statsSection: {
     marginBottom: APP_SPACING.lg,
   },
   sectionTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: APP_SPACING.sm,
   },
   chartCard: {
@@ -439,13 +442,10 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     gap: APP_SPACING.sm,
-    marginTop: APP_SPACING.sm,
-  },
-  extraBtn: {
-    marginTop: 2,
+    marginTop: APP_SPACING.xs,
   },
   attendanceStatusCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -461,10 +461,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   attendanceStatusTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
   },
   attendanceStatusSub: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
     marginTop: 2,
@@ -472,21 +473,7 @@ const styles = StyleSheet.create({
   emptyState: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: APP_SPACING.xl,
-  },
-  emptyTitle: {
-    color: APP_COLORS.navyHeading,
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  emptyDescription: {
-    color: APP_COLORS.textSecondary,
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    marginTop: 8,
+    padding: APP_SPACING.lg,
   },
 });
 

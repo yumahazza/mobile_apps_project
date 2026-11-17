@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { APP_COLORS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
 import {
   getStudentDirectory,
   PracticumSchedule,
@@ -45,7 +45,7 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({ schedule }
     setSaving(true);
     try {
       await updatePracticumParticipants(schedule.id, selected);
-      Alert.alert('Peserta diperbarui', `${selected.length} praktikan terdaftar pada jadwal ini.`);
+      Alert.alert('Peserta diperbarui', `${selected.length} praktikan terdaftar.`);
     } catch (error) {
       Alert.alert('Gagal menyimpan peserta', error instanceof Error ? error.message : 'Periksa Firestore Rules.');
     } finally {
@@ -58,15 +58,15 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({ schedule }
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Peserta Terdaftar</Text>
-          <Text style={styles.caption}>{selected.length} UID praktikan pada jadwal ini</Text>
+          <Text style={styles.caption}>{selected.length} praktikan dipilih</Text>
         </View>
-        <Ionicons name="people-outline" size={22} color={APP_COLORS.primary} />
+        <Ionicons name="people-outline" size={20} color={APP_COLORS.primary} />
       </View>
 
       {loading ? (
         <ActivityIndicator color={APP_COLORS.primary} />
       ) : students.length === 0 ? (
-        <Text style={styles.empty}>Belum ada akun dengan role student di collection users.</Text>
+        <Text style={styles.empty}>Belum ada akun praktikan terdaftar.</Text>
       ) : (
         students.map(student => {
           const active = selected.includes(student.uid);
@@ -86,24 +86,98 @@ export const ParticipantRoster: React.FC<ParticipantRosterProps> = ({ schedule }
         })
       )}
 
-      <Pressable style={[styles.save, saving && styles.disabled]} disabled={saving || loading} onPress={save}>
-        {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveText}>Simpan Daftar Peserta</Text>}
+      <Pressable
+        style={({ pressed }) => [
+          styles.save,
+          saving && styles.disabled,
+          pressed && styles.pressed,
+        ]}
+        disabled={saving || loading}
+        onPress={save}>
+        {saving ? (
+          <ActivityIndicator color={APP_COLORS.white} />
+        ) : (
+          <Text style={styles.saveText}>Simpan Daftar Peserta</Text>
+        )}
       </Pressable>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: APP_COLORS.neutral200 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 },
-  title: { color: APP_COLORS.navyHeading, fontWeight: '800', fontSize: 14 },
-  caption: { color: APP_COLORS.textSecondary, fontSize: 11, marginTop: 3 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 9, borderTopWidth: 1, borderTopColor: APP_COLORS.neutral100 },
-  copy: { flex: 1 },
-  name: { color: APP_COLORS.navyHeading, fontSize: 13, fontWeight: '700' },
-  meta: { color: APP_COLORS.textMuted, fontSize: 11, marginTop: 2 },
-  empty: { color: APP_COLORS.textSecondary, fontSize: 12, paddingVertical: 8 },
-  save: { marginTop: 8, backgroundColor: APP_COLORS.primary, padding: 12, borderRadius: 10, alignItems: 'center' },
-  saveText: { color: '#FFFFFF', fontWeight: '800', fontSize: 12 },
-  disabled: { opacity: 0.55 },
+  container: {
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
+    padding: APP_SPACING.lg,
+    marginBottom: APP_SPACING.md,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.inkPrimary,
+    fontSize: 15,
+  },
+  caption: {
+    fontFamily: APP_FONTS.medium,
+    color: APP_COLORS.textSecondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    minHeight: 44,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: APP_COLORS.divider,
+  },
+  copy: {
+    flex: 1,
+  },
+  name: {
+    fontFamily: APP_FONTS.semiBold,
+    color: APP_COLORS.inkPrimary,
+    fontSize: 14,
+  },
+  meta: {
+    fontFamily: APP_FONTS.regular,
+    color: APP_COLORS.textSecondary,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  empty: {
+    fontFamily: APP_FONTS.regular,
+    color: APP_COLORS.textSecondary,
+    fontSize: 13,
+    paddingVertical: 8,
+  },
+  save: {
+    marginTop: 12,
+    minHeight: 44,
+    backgroundColor: APP_COLORS.primary,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: APP_RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveText: {
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.white,
+    fontSize: 13,
+  },
+  disabled: {
+    opacity: 0.55,
+  },
+  pressed: {
+    opacity: 0.82,
+  },
 });

@@ -22,6 +22,8 @@ import { SentimentBadge } from '@/components/SentimentBadge';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
+  APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
 
@@ -60,7 +62,6 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
     Boolean(requestedScheduleId) &&
     !currentSchedule;
 
-  // Presensi real-time dari Cloud Firestore
   const {
     attendances,
     stats,
@@ -71,7 +72,6 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
     currentSchedule?.totalStudents ?? 0,
   );
 
-  // Feedback dan sentimen AI praktikan dari Cloud Firestore
   const {
     feedbacks,
     loading: feedbacksLoading,
@@ -100,8 +100,12 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
-        title="Rekap & Ulasan AI"
-        subtitle="Presensi real-time & sentimen pesan/kesan"
+        title="Rekap Presensi"
+        subtitle={
+          currentSchedule
+            ? `${currentSchedule.courseName} · ${currentSchedule.className}`
+            : 'Presensi & ulasan praktikum'
+        }
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -115,38 +119,23 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
             <Text style={styles.messageStateText}>Memuat data sesi...</Text>
           </View>
         ) : schedulesError ? (
-          <View style={styles.messageState}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={28}
-              color={APP_COLORS.error}
-            />
-            <Text style={styles.messageStateText}>
-              Gagal memuat jadwal: {schedulesError}
-            </Text>
-          </View>
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Jadwal"
+            description={schedulesError}
+          />
         ) : scheduleNotFound ? (
-          <View style={styles.messageState}>
-            <Ionicons
-              name="alert-circle-outline"
-              size={28}
-              color={APP_COLORS.neutral500}
-            />
-            <Text style={styles.messageStateText}>
-              Sesi yang diminta tidak ditemukan atau tidak dapat diakses.
-            </Text>
-          </View>
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Sesi Tidak Ditemukan"
+            description="Sesi yang diminta tidak tersedia."
+          />
         ) : !currentSchedule ? (
-          <View style={styles.messageState}>
-            <Ionicons
-              name="calendar-outline"
-              size={28}
-              color={APP_COLORS.neutral500}
-            />
-            <Text style={styles.messageStateText}>
-              Belum ada jadwal praktikum yang tersedia.
-            </Text>
-          </View>
+          <EmptyState
+            icon="calendar-outline"
+            title="Belum Ada Jadwal"
+            description="Buat jadwal praktikum di menu Jadwal."
+          />
         ) : (
           <>
             {/* Pemilih Sesi Horizontal */}
@@ -181,7 +170,7 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                           styles.scheduleChipSub,
                           isSelected && styles.scheduleChipSubActive,
                         ]}>
-                        {item.className} • {item.date}
+                        {item.className} · {item.date}
                       </Text>
                     </Pressable>
                   );
@@ -189,16 +178,15 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
               </ScrollView>
             )}
 
-            {/* Data Report Hero Card (Reference UI image 5 & image 6) */}
+            {/* Hero Ringkasan Presensi (#273287 + #D8E63C) */}
             <View style={styles.reportCard}>
               <View style={styles.reportHeaderRow}>
                 <View style={styles.reportTitleGroup}>
-                  <Text style={styles.courseName}>
+                  <Text style={styles.courseName} numberOfLines={2}>
                     {currentSchedule.courseName}
                   </Text>
                   <Text style={styles.sessionMeta}>
-                    {currentSchedule.className} • {currentSchedule.time} |{' '}
-                    {currentSchedule.room}
+                    {currentSchedule.className} · {currentSchedule.time} · {currentSchedule.room}
                   </Text>
                 </View>
                 <StatusBadge status={currentSchedule.status} size="sm" />
@@ -206,7 +194,9 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
 
               <View style={styles.progressBlock}>
                 <View style={styles.progressTopRow}>
-                  <Text style={styles.progressLabel}>Tingkat Kehadiran</Text>
+                  <Text style={styles.progressLabel}>
+                    {stats.hadirCount}/{stats.totalRegistered} Hadir
+                  </Text>
                   <Text style={styles.progressValue}>
                     {stats.attendancePercentage}%
                   </Text>
@@ -226,21 +216,24 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                 </View>
               </View>
 
-              {/* 4 Bento Mini Stat Tiles */}
+              {/* Ringkasan 1 Baris */}
               <View style={styles.metricsRow}>
-                <View style={[styles.metricBox, styles.metricGreen]}>
+                <View style={styles.metricCell}>
                   <Text style={styles.metricValue}>{stats.hadirCount}</Text>
                   <Text style={styles.metricLabel}>Hadir</Text>
                 </View>
-                <View style={[styles.metricBox, styles.metricAmber]}>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricCell}>
                   <Text style={styles.metricValue}>{stats.izinCount}</Text>
                   <Text style={styles.metricLabel}>Izin</Text>
                 </View>
-                <View style={[styles.metricBox, styles.metricRed]}>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricCell}>
                   <Text style={styles.metricValue}>{stats.alfaCount}</Text>
                   <Text style={styles.metricLabel}>Alfa</Text>
                 </View>
-                <View style={[styles.metricBox, styles.metricBlue]}>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricCell}>
                   <Text style={styles.metricValue}>
                     {stats.totalRegistered}
                   </Text>
@@ -248,7 +241,6 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                 </View>
               </View>
 
-              {/* Tombol Review Pengajuan Izin Manual */}
               <Pressable
                 onPress={() =>
                   navigation.navigate('LeaveApproval', {
@@ -262,23 +254,23 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                 <View style={styles.leaveShortcutLeft}>
                   <Ionicons
                     name="clipboard-outline"
-                    size={17}
-                    color="#FFFFFF"
+                    size={16}
+                    color={APP_COLORS.tetsuKon}
                   />
-                  <Text style={styles.leaveShortcutText}>
-                    Review Pengajuan Izin Praktikan
-                  </Text>
+                  <Text style={styles.leaveShortcutText}>Review Izin</Text>
                 </View>
-                <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+                <Ionicons
+                  name="chevron-forward"
+                  size={16}
+                  color={APP_COLORS.tetsuKon}
+                />
               </Pressable>
             </View>
 
-            {/* Daftar presensi mahasiswa */}
-            <View style={styles.studentListSection}>
+            {/* Daftar Presensi Mahasiswa dalam Panel Putih Bersekat Tipis */}
+            <View style={styles.sectionBlock}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>
-                  Daftar Presensi Mahasiswa
-                </Text>
+                <Text style={styles.sectionTitle}>Daftar Hadir</Text>
                 {attendancesLoading && (
                   <ActivityIndicator size="small" color={APP_COLORS.primary} />
                 )}
@@ -288,11 +280,11 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                 <Ionicons
                   name="search"
                   size={18}
-                  color={APP_COLORS.neutral500}
+                  color={APP_COLORS.textSecondary}
                 />
                 <TextInput
                   style={styles.searchInput}
-                  placeholder="Cari nama atau NIM praktikan..."
+                  placeholder="Cari nama atau NIM..."
                   placeholderTextColor={APP_COLORS.neutral400}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -307,155 +299,125 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                     <Ionicons
                       name="close-circle"
                       size={16}
-                      color={APP_COLORS.neutral500}
+                      color={APP_COLORS.textSecondary}
                     />
                   </Pressable>
                 )}
               </View>
 
               {attendancesError ? (
-                <View style={styles.messageState}>
-                  <Ionicons
-                    name="alert-circle-outline"
-                    size={24}
-                    color={APP_COLORS.error}
-                  />
-                  <Text style={styles.messageStateText}>
-                    Gagal memuat presensi: {attendancesError}
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="alert-circle-outline"
+                  title="Gagal Memuat Presensi"
+                  description={attendancesError}
+                />
               ) : attendancesLoading ? (
-                <View style={styles.messageState}>
+                <View style={styles.messageStateCompact}>
                   <ActivityIndicator size="small" color={APP_COLORS.primary} />
-                  <Text style={styles.messageStateText}>
-                    Memuat data presensi...
-                  </Text>
+                  <Text style={styles.messageStateText}>Memuat presensi...</Text>
                 </View>
               ) : filteredAttendanceLogs.length === 0 ? (
                 <EmptyState
                   icon="people-outline"
                   title={
                     searchQuery.trim()
-                      ? 'Mahasiswa Tidak Ditemukan'
-                      : 'Belum Ada Mahasiswa Tercatat'
+                      ? 'Tidak Ditemukan'
+                      : 'Belum Ada Presensi'
                   }
                   description={
                     searchQuery.trim()
-                      ? `Tidak ada data presensi yang cocok dengan kata kunci "${searchQuery}".`
-                      : 'Belum ada catatan presensi atau izin yang disetujui untuk sesi ini.'
+                      ? `Tidak ada hasil untuk "${searchQuery}".`
+                      : 'Belum ada mahasiswa yang tercatat pada sesi ini.'
                   }
                 />
               ) : (
-                <View style={styles.attendanceCardsList}>
-                  {filteredAttendanceLogs.map((log, index) => (
-                    <Pressable
-                      key={log.id}
-                      onPress={() =>
-                        navigation.navigate('AttendanceDetail', {
-                          record: log,
-                          schedule: currentSchedule,
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.attendanceItemCard,
-                        pressed && styles.pressed,
-                      ]}>
-                      <View style={styles.indexCircle}>
-                        <Text style={styles.indexCircleText}>{index + 1}</Text>
-                      </View>
+                <View style={styles.attendancePanel}>
+                  {filteredAttendanceLogs.map((log, index) => {
+                    const initial = (log.studentName || 'M').charAt(0).toUpperCase();
+                    const isLast = index === filteredAttendanceLogs.length - 1;
 
-                      <View style={styles.studentCol}>
-                        <Text style={styles.studentNameText} numberOfLines={1}>
-                          {log.studentName}
-                        </Text>
-                        <Text style={styles.studentNimText}>
-                          NIM {log.nim} • {log.timestamp}
-                        </Text>
-                      </View>
+                    return (
+                      <Pressable
+                        key={log.id}
+                        onPress={() =>
+                          navigation.navigate('AttendanceDetail', {
+                            record: log,
+                            schedule: currentSchedule,
+                          })
+                        }
+                        style={({ pressed }) => [
+                          styles.attendanceRow,
+                          !isLast && styles.attendanceRowDivider,
+                          pressed && styles.pressed,
+                        ]}>
+                        <View style={styles.avatarInitialBox}>
+                          <Text style={styles.avatarInitialText}>{initial}</Text>
+                        </View>
 
-                      <StatusBadge status={log.status} size="sm" />
-                    </Pressable>
-                  ))}
+                        <View style={styles.studentCol}>
+                          <Text style={styles.studentNameText} numberOfLines={1}>
+                            {log.studentName}
+                          </Text>
+                          <Text style={styles.studentNimText} numberOfLines={1}>
+                            NIM {log.nim} · {log.timestamp}
+                          </Text>
+                        </View>
+
+                        <StatusBadge status={log.status} size="sm" />
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
             </View>
 
-            {/* Pesan & Kesan Mahasiswa + AI Sentiment Review */}
-            <View style={styles.feedbackSection}>
+            {/* Ulasan Praktikum + AI Sentiment */}
+            <View style={styles.sectionBlock}>
               <View style={styles.sectionHeaderRow}>
-                <View style={styles.aiHeaderLeft}>
-                  <Text style={styles.sectionTitle}>
-                    Ulasan Praktikum (Review AI)
-                  </Text>
-                  <View style={styles.aiBadgePill}>
-                    <Ionicons name="sparkles" size={11} color="#4F46E5" />
-                    <Text style={styles.aiBadgePillText}>AI Sentimen</Text>
-                  </View>
+                <Text style={styles.sectionTitle}>Ulasan Praktikum</Text>
+                <View style={styles.aiBadgePill}>
+                  <Ionicons name="sparkles" size={11} color={APP_COLORS.primary} />
+                  <Text style={styles.aiBadgePillText}>AI Sentimen</Text>
                 </View>
-
-                {feedbacksLoading && (
-                  <ActivityIndicator size="small" color={APP_COLORS.primary} />
-                )}
               </View>
 
-              {/* Ringkasan Sentimen AI */}
               {feedbacks.length > 0 && (
                 <View style={styles.sentimentSummaryRow}>
                   <View style={[styles.sentimentChip, styles.sentimentPos]}>
-                    <Text style={styles.sentimentChipNum}>
-                      {sentimentCounts.pos}
+                    <Text style={styles.sentimentPosText}>
+                      {sentimentCounts.pos} Positif
                     </Text>
-                    <Text style={styles.sentimentChipText}>Positif</Text>
                   </View>
                   <View style={[styles.sentimentChip, styles.sentimentNet]}>
-                    <Text style={styles.sentimentChipNum}>
-                      {sentimentCounts.net}
+                    <Text style={styles.sentimentNetText}>
+                      {sentimentCounts.net} Netral
                     </Text>
-                    <Text style={styles.sentimentChipText}>Netral</Text>
                   </View>
                   <View style={[styles.sentimentChip, styles.sentimentNeg]}>
-                    <Text style={styles.sentimentChipNum}>
-                      {sentimentCounts.neg}
+                    <Text style={styles.sentimentNegText}>
+                      {sentimentCounts.neg} Negatif
                     </Text>
-                    <Text style={styles.sentimentChipText}>Negatif</Text>
                   </View>
                 </View>
               )}
 
               {feedbacksError ? (
-                <View style={styles.messageState}>
-                  <Ionicons
-                    name="alert-circle-outline"
-                    size={24}
-                    color={APP_COLORS.error}
-                  />
-                  <Text style={styles.messageStateText}>
-                    Gagal memuat pesan dan kesan: {feedbacksError}
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="alert-circle-outline"
+                  title="Gagal Memuat Ulasan"
+                  description={feedbacksError}
+                />
               ) : feedbacksLoading ? (
-                <View style={styles.messageState}>
+                <View style={styles.messageStateCompact}>
                   <ActivityIndicator size="small" color={APP_COLORS.primary} />
-                  <Text style={styles.messageStateText}>
-                    Memuat pesan dan kesan...
-                  </Text>
+                  <Text style={styles.messageStateText}>Memuat ulasan...</Text>
                 </View>
               ) : feedbacks.length === 0 ? (
-                <View style={styles.feedbackEmptyCard}>
-                  <Ionicons
-                    name="chatbubbles-outline"
-                    size={26}
-                    color="#64748B"
-                  />
-                  <Text style={styles.feedbackEmptyTitle}>
-                    Belum Ada Ulasan Praktikum
-                  </Text>
-                  <Text style={styles.feedbackEmptyDesc}>
-                    Ulasan praktikan setelah sesi selesai akan dianalisis
-                    otomatis oleh AI (Positif, Netral, Negatif) dan tampil di
-                    sini.
-                  </Text>
-                </View>
+                <EmptyState
+                  icon="chatbubbles-outline"
+                  title="Belum Ada Ulasan"
+                  description="Ulasan praktikan setelah sesi selesai akan tampil di sini."
+                />
               ) : (
                 <View style={styles.feedbackList}>
                   {feedbacks.map((fb) => (
@@ -474,7 +436,7 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
                       </View>
 
                       <Text style={styles.feedbackCommentText}>
-                        &quot;{fb.comment}&quot;
+                        “{fb.comment}”
                       </Text>
                     </View>
                   ))}
@@ -497,11 +459,11 @@ export const SessionRecapScreen: React.FC<SessionRecapScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F5F6FA',
+    backgroundColor: APP_COLORS.background,
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.sm,
+    paddingTop: APP_SPACING.xs,
     paddingBottom: APP_SPACING.xxl,
   },
   messageState: {
@@ -510,83 +472,83 @@ const styles = StyleSheet.create({
     padding: APP_SPACING.xl,
     minHeight: 160,
   },
+  messageStateCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: APP_SPACING.sm,
+    paddingVertical: APP_SPACING.md,
+  },
   messageStateText: {
-    color: '#475569',
+    fontFamily: APP_FONTS.medium,
+    color: APP_COLORS.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
     textAlign: 'center',
-    marginTop: APP_SPACING.sm,
   },
   scheduleTabsRow: {
     flexDirection: 'row',
-    gap: 10,
-    paddingBottom: 14,
+    gap: 8,
+    paddingBottom: APP_SPACING.md,
   },
   scheduleChip: {
     paddingHorizontal: 14,
     paddingVertical: 10,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-    minWidth: 155,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    minWidth: 150,
   },
   scheduleChipActive: {
-    backgroundColor: '#0F172A',
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
   },
   scheduleChipTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
+    color: APP_COLORS.inkPrimary,
   },
   scheduleChipTitleActive: {
-    color: '#FFFFFF',
+    color: APP_COLORS.white,
   },
   scheduleChipSub: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    color: APP_COLORS.textSecondary,
     marginTop: 2,
   },
   scheduleChipSubActive: {
-    color: '#CBD5E1',
+    color: APP_COLORS.nordicBreeze,
   },
   reportCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 18,
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-    marginBottom: 18,
+    backgroundColor: APP_COLORS.intergalactic,
+    borderRadius: APP_RADIUS.hero,
+    padding: APP_SPACING.xl,
+    marginBottom: APP_SPACING.xl,
   },
   reportHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 10,
-    marginBottom: 14,
+    marginBottom: APP_SPACING.md,
   },
   reportTitleGroup: {
     flex: 1,
   },
   courseName: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 3,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: APP_COLORS.durantaYellow,
+    marginBottom: 4,
   },
   sessionMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#475569',
+    color: 'rgba(255, 255, 255, 0.88)',
   },
   progressBlock: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 14,
+    marginBottom: APP_SPACING.md,
   },
   progressTopRow: {
     flexDirection: 'row',
@@ -595,71 +557,62 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   progressLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 13,
+    color: APP_COLORS.white,
   },
   progressValue: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0F172A',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 14,
+    color: APP_COLORS.durantaYellow,
   },
   progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: '#E2E8F0',
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    borderRadius: 999,
-    backgroundColor: '#0F172A',
+    borderRadius: 4,
+    backgroundColor: APP_COLORS.durantaYellow,
   },
   metricsRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
-  },
-  metricBox: {
-    flex: 1,
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 6,
     alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: APP_RADIUS.md,
+    paddingVertical: 10,
+    marginBottom: APP_SPACING.md,
   },
-  metricGreen: {
-    backgroundColor: '#86EFAC',
+  metricCell: {
+    flex: 1,
+    alignItems: 'center',
   },
-  metricAmber: {
-    backgroundColor: '#FDE68A',
-  },
-  metricRed: {
-    backgroundColor: '#FECACA',
-  },
-  metricBlue: {
-    backgroundColor: '#C7D2FE',
+  metricDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   metricValue: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 17,
+    color: APP_COLORS.white,
   },
   metricLabel: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 2,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 1,
   },
   leaveShortcutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    backgroundColor: APP_COLORS.durantaYellow,
+    borderRadius: APP_RADIUS.md,
+    minHeight: 46,
+    paddingHorizontal: APP_SPACING.lg,
   },
   leaveShortcutLeft: {
     flexDirection: 'row',
@@ -667,183 +620,154 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   leaveShortcutText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 14,
+    color: APP_COLORS.tetsuKon,
   },
-  studentListSection: {
-    marginTop: 4,
+  sectionBlock: {
+    marginBottom: APP_SPACING.xl,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: APP_SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 17,
+    color: APP_COLORS.inkPrimary,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-    borderRadius: 999,
-    paddingHorizontal: 14,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    borderRadius: APP_RADIUS.md,
+    paddingHorizontal: APP_SPACING.md,
     height: 46,
-    marginBottom: 12,
+    marginBottom: APP_SPACING.md,
   },
   searchInput: {
     flex: 1,
     height: '100%',
     marginLeft: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
   },
   clearSearchBtn: {
     padding: 4,
   },
-  attendanceCardsList: {
-    gap: 10,
+  attendancePanel: {
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    overflow: 'hidden',
   },
-  attendanceItemCard: {
+  attendanceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
+    paddingVertical: 12,
+    paddingHorizontal: APP_SPACING.lg,
   },
-  indexCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#E0E7FF',
-    borderWidth: 1,
-    borderColor: '#0F172A',
+  attendanceRowDivider: {
+    borderBottomWidth: 1,
+    borderBottomColor: APP_COLORS.divider,
+  },
+  avatarInitialBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: APP_COLORS.nordicBreeze,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  indexCircleText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0F172A',
+  avatarInitialText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
   },
   studentCol: {
     flex: 1,
     marginRight: 8,
   },
   studentNameText: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
+    color: APP_COLORS.inkPrimary,
   },
   studentNimText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 2,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+    marginTop: 1,
   },
   pressed: {
     opacity: 0.78,
-  },
-  feedbackSection: {
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  aiHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   aiBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 999,
+    backgroundColor: APP_COLORS.softBlue,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.pill,
   },
   aiBadgePillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#4F46E5',
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 11,
+    color: APP_COLORS.primary,
   },
   sentimentSummaryRow: {
     flexDirection: 'row',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: APP_SPACING.md,
   },
   sentimentChip: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
+    paddingVertical: 8,
+    borderRadius: APP_RADIUS.md,
   },
   sentimentPos: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: APP_COLORS.openedSoft,
   },
   sentimentNet: {
-    backgroundColor: '#E0F2FE',
+    backgroundColor: APP_COLORS.softBlue,
   },
   sentimentNeg: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: APP_COLORS.dangerSoft,
   },
-  sentimentChipNum: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  sentimentChipText: {
+  sentimentPosText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 12,
-    fontWeight: '700',
-    color: '#1E293B',
+    color: APP_COLORS.opened,
   },
-  feedbackEmptyCard: {
-    padding: 22,
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
-  },
-  feedbackEmptyTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  feedbackEmptyDesc: {
+  sentimentNetText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
+    color: APP_COLORS.primary,
+  },
+  sentimentNegText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 12,
+    color: APP_COLORS.dangerText,
   },
   feedbackList: {
-    gap: 10,
+    gap: APP_SPACING.sm,
   },
   feedbackCard: {
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#0F172A',
+    padding: APP_SPACING.lg,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
   },
   feedbackCardHeader: {
     flexDirection: 'row',
@@ -856,23 +780,22 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   feedbackAuthorName: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
+    color: APP_COLORS.inkPrimary,
   },
   feedbackDateText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+    color: APP_COLORS.textMuted,
     marginTop: 1,
   },
   feedbackCommentText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#1E293B',
-    lineHeight: 19,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 20,
     marginTop: 4,
-    fontStyle: 'italic',
   },
 });
 

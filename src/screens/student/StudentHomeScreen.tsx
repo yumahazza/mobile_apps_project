@@ -8,6 +8,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -19,15 +20,14 @@ import {
 import type { AttendanceRecordItem } from '@/types/attendance';
 import { FeedbackSection } from '@/components/FeedbackSection';
 import { LeaveRequestSection } from '@/components/LeaveRequestSection';
-import { Card } from '@/components/Card';
 import { StatusBadge } from '@/components/StatusBadge';
 import { CustomButton } from '@/components/CustomButton';
-import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { HeaderRolePicker } from '@/components/HeaderRolePicker';
+import { EmptyState } from '@/components/EmptyState';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
   APP_SHADOWS,
@@ -48,7 +48,7 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
   const { schedules, loading: schedulesLoading, error: schedulesError } =
     useFirestoreSchedules(activeUser.id, 'student');
   const activeSchedule =
-    schedules.find(schedule => schedule.id === activeScheduleId) || schedules[0];
+    schedules.find((schedule) => schedule.id === activeScheduleId) || schedules[0];
 
   const currentSchedule = activeSchedule || schedules[0];
 
@@ -62,7 +62,6 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
   }>({ key: '', record: null });
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState<boolean>(false);
 
-  // Berlangganan dokumen presensi mahasiswa di Cloud Firestore
   useEffect(() => {
     if (!attendanceSubKey || !currentSchedule?.id || !activeUser?.id) {
       return undefined;
@@ -71,8 +70,8 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     const unsubscribe = subscribeToStudentAttendanceForSchedule(
       currentSchedule.id,
       activeUser.id,
-      record => setAttendanceState({ key: activeKey, record }),
-      err => console.warn('Attendance listener error:', err),
+      (record) => setAttendanceState({ key: activeKey, record }),
+      (err) => console.warn('Attendance listener error:', err),
     );
     return () => {
       unsubscribe();
@@ -97,9 +96,14 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
 
   const isPresent = studentRecord?.status === 'Hadir';
   const isExcused = studentRecord?.status === 'Izin';
-  const hasAttendanceRecord = isPresent || isExcused;
-
   const isSessionOpen = currentSchedule?.status === 'DIBUKA';
+
+  const userInitials = (activeUser.name || 'M')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   const handleAttendancePress = async () => {
     if (!currentSchedule) return;
@@ -121,21 +125,72 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
       setFeedbackModal({
         visible: true,
         success: false,
-        message: error instanceof Error ? error.message : 'Presensi gagal dicatat ke Firestore.',
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Presensi gagal dicatat.',
       });
     } finally {
       setIsSubmittingAttendance(false);
     }
   };
 
+  const renderTopBar = () => (
+    <View style={styles.topBar}>
+      <Pressable
+        onPress={() => navigation.navigate('Profile')}
+        style={({ pressed }) => [
+          styles.identityRow,
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.avatarCircle}>
+          <Text style={styles.avatarInitials}>{userInitials}</Text>
+        </View>
+        <View style={styles.identityTextGroup}>
+          <Text style={styles.userName} numberOfLines={1}>
+            Halo, {activeUser.name.split(' ')[0]}
+          </Text>
+          <Text style={styles.userRole} numberOfLines={1}>
+            Praktikan · NIM {activeUser.nim || '-'}
+          </Text>
+        </View>
+      </Pressable>
+
+      <Pressable
+        onPress={() => navigation.navigate('Notifications')}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Notifikasi"
+        style={({ pressed }) => [
+          styles.notifButton,
+          pressed && styles.pressed,
+        ]}>
+        <Ionicons
+          name="notifications-outline"
+          size={20}
+          color={APP_COLORS.inkPrimary}
+        />
+        <View style={styles.notifDot} />
+      </Pressable>
+    </View>
+  );
+
   if (schedulesLoading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <AppHeader title="PPK" onNotificationPress={() => navigation.navigate('Notifications')} />
-        <View style={styles.emptyScheduleState}>
-          <Text style={styles.emptyScheduleTitle}>Memuat jadwal...</Text>
-          <Text style={styles.emptyScheduleText}>Menghubungkan ke Cloud Firestore.</Text>
+        <StatusBar style="dark" />
+        <View style={styles.loadingScreen}>
+          {renderTopBar()}
+          <View style={styles.centeredState}>
+            <ActivityIndicator size="large" color={APP_COLORS.primary} />
+            <Text style={styles.emptyTitle}>Memuat jadwal...</Text>
+          </View>
         </View>
+        <BottomNavigation
+          role="student"
+          activeTab="StudentHome"
+          onTabChange={(tabKey) => navigation.navigate(tabKey)}
+        />
       </SafeAreaView>
     );
   }
@@ -143,207 +198,198 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
   if (schedulesError || !currentSchedule) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <AppHeader title="PPK" onNotificationPress={() => navigation.navigate('Notifications')} />
-        <View style={styles.emptyScheduleState}>
-          <Text style={styles.emptyScheduleTitle}>
-            {schedulesError ? 'Jadwal belum dapat dimuat' : 'Belum ada jadwal terdaftar'}
-          </Text>
-          <Text style={styles.emptyScheduleText}>
-            {schedulesError || 'Asisten belum memasukkan UID akunmu ke daftar peserta praktikum.'}
-          </Text>
+        <StatusBar style="dark" />
+        <View style={styles.loadingScreen}>
+          {renderTopBar()}
+          <View style={styles.centeredState}>
+            <EmptyState
+              icon="calendar-outline"
+              title={
+                schedulesError
+                  ? 'Jadwal Belum Tersedia'
+                  : 'Belum Ada Jadwal'
+              }
+              description={
+                schedulesError ||
+                'Akun Anda belum didaftarkan ke jadwal praktikum.'
+              }
+            />
+          </View>
         </View>
-        <BottomNavigation role="student" activeTab="Home" onTabChange={tabKey => navigation.navigate(tabKey)} />
+        <BottomNavigation
+          role="student"
+          activeTab="StudentHome"
+          onTabChange={(tabKey) => navigation.navigate(tabKey)}
+        />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
-      <AppHeader
-        title="PPK"
-        onNotificationPress={() => navigation.navigate('Notifications')}
-      />
+      <StatusBar style="dark" />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Greeting Section with Role Switcher */}
-        <View style={styles.greetingRow}>
-          <View style={styles.greetingTextGroup}>
-            <Text style={styles.greetingName}>
-              Halo, {activeUser.name.split(' ')[0]} 👋
-            </Text>
-            <Text style={styles.greetingRole}>
-              Praktikan · NIM {activeUser.nim || '-'}
-            </Text>
-          </View>
-          <HeaderRolePicker compact />
+        {renderTopBar()}
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.screenTitle}>Jadwal Hari Ini</Text>
+          <Pressable
+            onPress={() => navigation.navigate('ScheduleList')}
+            hitSlop={6}
+            style={({ pressed }) => [styles.linkAction, pressed && styles.pressed]}>
+            <Text style={styles.linkActionText}>Lihat Semua</Text>
+            <Ionicons
+              name="chevron-forward"
+              size={14}
+              color={APP_COLORS.primary}
+            />
+          </Pressable>
         </View>
 
-        {/* Main Schedule & Presensi Card */}
-        {currentSchedule && (
-          <Card
-            style={[
-              styles.mainCard,
-              isSessionOpen && !hasAttendanceRecord && styles.mainCardOpen,
-            ]}>
-            {/* Header: StatusBadge & Date */}
-            <View style={styles.cardHeaderRow}>
-              <View>
-                <Text style={styles.cardSubtitleLabel}>Sesi Praktikum</Text>
-                <Text style={styles.courseTitle}>{currentSchedule.courseName}</Text>
-              </View>
-              <StatusBadge status={currentSchedule.status} size="sm" />
-            </View>
+        {/* Pemilih Sesi Praktikum (sinkron dengan presensi & izin) */}
+        {schedules.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.scheduleTabsRow}>
+            {schedules.map((item) => {
+              const isSelected = item.id === currentSchedule?.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setActiveScheduleId(item.id)}
+                  style={[
+                    styles.scheduleChip,
+                    isSelected && styles.scheduleChipActive,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.scheduleChipTitle,
+                      isSelected && styles.scheduleChipTitleActive,
+                    ]}
+                    numberOfLines={1}>
+                    {item.courseName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.scheduleChipSub,
+                      isSelected && styles.scheduleChipSubActive,
+                    ]}>
+                    {item.className} · {item.date}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
 
-            <Text style={styles.courseMeta}>
-              {currentSchedule.className} • {currentSchedule.time} | {currentSchedule.room}
+        {/* Single Hero Card Sesi Aktif / Terpilih (#273287 + #D8E63C) */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroClassPill}>
+              <Text style={styles.heroClassText}>
+                {currentSchedule.className}
+              </Text>
+            </View>
+            <StatusBadge status={currentSchedule.status} size="sm" />
+          </View>
+
+          <Text style={styles.heroCourseTitle} numberOfLines={2}>
+            {currentSchedule.courseName}
+          </Text>
+
+          <View style={styles.heroMetaRow}>
+            <Ionicons
+              name="time-outline"
+              size={14}
+              color="rgba(255,255,255,0.88)"
+            />
+            <Text style={styles.heroMetaText}>
+              {currentSchedule.time} · {currentSchedule.room} · {currentSchedule.date}
             </Text>
+          </View>
 
-            {/* Live Indicator Banner */}
-            {isSessionOpen && !hasAttendanceRecord && (
-              <View style={styles.liveBanner}>
-                <View style={styles.pulsingDot} />
-                <Text style={styles.liveBannerText}>
-                  Sesi Sedang Dibuka • Presensi Aktif Sekarang
-                </Text>
-              </View>
-            )}
+          <View style={styles.heroDivider} />
 
-            <View style={styles.divider} />
-
-            {/* Attendance CTA Section */}
-            <View style={styles.ctaContainer}>
-              {isPresent ? (
-                /* Kasus Sudah Presensi Hadir */
-                <View style={styles.attendedBox}>
-                  <View style={styles.attendedTitleRow}>
-                    <Ionicons
-                      name="checkmark-circle"
-                      size={20}
-                      color={APP_COLORS.opened}
-                    />
-                    <Text style={styles.attendedTitle}>Kehadiran Tercatat</Text>
-                  </View>
-                  {studentRecord && (
-                    <Text style={styles.timestampText}>
-                      Waktu Presensi: {studentRecord.timestamp}
-                    </Text>
-                  )}
-                  <CustomButton
-                    title="✓ Sudah Presensi"
-                    variant="outline"
-                    disabled
-                    size="md"
-                    onPress={() => {}}
-                    style={styles.attendedBtn}
-                  />
-                </View>
-              ) : isExcused ? (
-                /* Kasus Tercatat Izin (Pengajuan Izin Disetujui) */
-                <View style={styles.attendedBox}>
-                  <View style={styles.attendedTitleRow}>
-                    <Ionicons
-                      name="document-text"
-                      size={20}
-                      color={APP_COLORS.warning}
-                    />
-                    <Text style={styles.excusedTitle}>Izin Disetujui</Text>
-                  </View>
-                  {studentRecord && (
-                    <Text style={styles.timestampText}>
-                      Status kehadiran Anda tercatat sebagai Izin ({studentRecord.date} • {studentRecord.timestamp})
-                    </Text>
-                  )}
-                  <CustomButton
-                    title="✓ Tercatat Izin"
-                    variant="outline"
-                    disabled
-                    size="md"
-                    onPress={() => {}}
-                    style={styles.attendedBtn}
-                  />
-                </View>
-              ) : isSessionOpen ? (
-                /* Kasus Sesi Dibuka & Belum Presensi */
-                <View>
-                  <CustomButton
-                    title={isSubmittingAttendance ? 'Mencatat Kehadiran...' : 'Presensi Sekarang'}
-                    variant="primary"
-                    size="lg"
-                    disabled={isSubmittingAttendance}
-                    leftIcon={
-                      isSubmittingAttendance ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={20}
-                          color={APP_COLORS.white}
-                        />
-                      )
-                    }
-                    onPress={handleAttendancePress}
-                  />
-                  <Text style={styles.ctaHint}>
-                    Tekan tombol untuk mencatatkan kehadiran Anda di sesi ini
-                  </Text>
-                </View>
-              ) : currentSchedule.status === 'BELUM_DIBUKA' ? (
-                /* Kasus Belum Dibuka */
-                <View style={styles.disabledBox}>
-                  <Text style={styles.disabledText}>
-                    Sesi praktikum belum dibuka oleh asisten.
-                  </Text>
-                  <CustomButton
-                    title="Presensi Belum Dibuka"
-                    variant="outline"
-                    disabled
-                    size="md"
-                    onPress={() => {}}
-                  />
-                </View>
-              ) : (
-                /* Kasus Selesai */
-                <View style={styles.disabledBox}>
-                  <Text style={styles.disabledText}>
-                    Sesi praktikum telah ditutup. Presensi berakhir.
-                  </Text>
-                  <CustomButton
-                    title="Sesi Telah Ditutup"
-                    variant="outline"
-                    disabled
-                    size="md"
-                    onPress={() => {}}
-                  />
-                </View>
-              )}
+          {isPresent ? (
+            <View style={styles.statusBoxPresent}>
+              <Ionicons
+                name="checkmark-circle"
+                size={18}
+                color={APP_COLORS.opened}
+              />
+              <Text style={styles.statusBoxPresentText}>
+                Hadir · {studentRecord?.timestamp}
+              </Text>
             </View>
-          </Card>
-        )}
+          ) : isExcused ? (
+            <View style={styles.statusBoxExcused}>
+              <Ionicons
+                name="document-text"
+                size={18}
+                color={APP_COLORS.warning}
+              />
+              <Text style={styles.statusBoxExcusedText}>
+                Izin Disetujui · {studentRecord?.date}
+              </Text>
+            </View>
+          ) : isSessionOpen ? (
+            <CustomButton
+              title={isSubmittingAttendance ? 'Mencatat...' : 'Presensi Sekarang'}
+              variant="accent"
+              size="md"
+              disabled={isSubmittingAttendance}
+              leftIcon={
+                isSubmittingAttendance ? (
+                  <ActivityIndicator size="small" color={APP_COLORS.tetsuKon} />
+                ) : (
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={18}
+                    color={APP_COLORS.tetsuKon}
+                  />
+                )
+              }
+              onPress={handleAttendancePress}
+            />
+          ) : (
+            <View style={styles.heroDisabledPill}>
+              <Ionicons
+                name="lock-closed-outline"
+                size={15}
+                color="rgba(255,255,255,0.85)"
+              />
+              <Text style={styles.heroDisabledText}>
+                {currentSchedule.status === 'BELUM_DIBUKA'
+                  ? 'Sesi belum dibuka asisten'
+                  : 'Sesi presensi telah ditutup'}
+              </Text>
+            </View>
+          )}
+        </View>
 
-        {/* Pengajuan Izin & Status Izin Real-time (Fritz) */}
-        {currentSchedule && (
-          <LeaveRequestSection
-            scheduleId={currentSchedule.id}
-            courseName={currentSchedule.courseName}
-            className={currentSchedule.className}
-            sessionStatus={currentSchedule.status}
-            studentId={activeUser.id}
-            studentName={activeUser.name}
-            nim={activeUser.nim}
-            isAttended={isPresent}
-            onNavigateToLeaveScreen={() =>
-              navigation.navigate('LeaveRequest', {
-                scheduleId: currentSchedule.id,
-              })
-            }
-          />
-        )}
+        {/* Pengajuan & Status Izin Ringkas */}
+        <LeaveRequestSection
+          scheduleId={currentSchedule.id}
+          courseName={currentSchedule.courseName}
+          className={currentSchedule.className}
+          sessionStatus={currentSchedule.status}
+          studentId={activeUser.id}
+          studentName={activeUser.name}
+          nim={activeUser.nim}
+          isAttended={isPresent}
+          onNavigateToLeaveScreen={() =>
+            navigation.navigate('LeaveRequest', {
+              scheduleId: currentSchedule.id,
+            })
+          }
+        />
 
-        {/* Form Pesan & Kesan setelah praktikum SELESAI */}
-        {currentSchedule && currentSchedule.status === 'SELESAI' && (
+        {/* Pesan & Kesan setelah praktikum SELESAI */}
+        {currentSchedule.status === 'SELESAI' && (
           <FeedbackSection
             scheduleId={currentSchedule.id}
             isSessionFinished={true}
@@ -352,44 +398,49 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
           />
         )}
 
-        {/* Section Jadwal Hari Ini */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>Jadwal Hari Ini</Text>
-          <Pressable
-            onPress={() => navigation.navigate('ScheduleList')}
-            style={({ pressed }) => pressed && styles.pressed}>
-            <Text style={styles.seeAllText}>Lihat Semua &gt;</Text>
-          </Pressable>
+        <View style={styles.sectionDivider} />
+
+        {/* Daftar Sesi */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionHeading}>Daftar Sesi</Text>
+          <Text style={styles.countLabel}>{schedules.length} sesi</Text>
         </View>
 
-        {/* Schedule List */}
         <View style={styles.scheduleList}>
           {schedules.map((item, idx) => {
             const isSelected = item.id === currentSchedule?.id;
             return (
-              <Card
+              <Pressable
                 key={item.id}
                 onPress={() => {
                   setActiveScheduleId(item.id);
                   navigation.navigate('SessionDetail', { scheduleId: item.id });
                 }}
-                style={[
-                  styles.scheduleItemCard,
-                  isSelected && styles.scheduleItemSelected,
+                style={({ pressed }) => [
+                  styles.scheduleCard,
+                  idx % 2 === 1 && !isSelected && styles.scheduleCardTint,
+                  isSelected && styles.scheduleCardSelected,
+                  pressed && styles.pressed,
                 ]}>
-                <View style={styles.scheduleRowContent}>
-                  <View style={styles.courseIndexBadge}>
-                    <Text style={styles.courseIndexText}>{idx + 1}</Text>
-                  </View>
+                <View style={styles.scheduleRowTop}>
                   <View style={styles.courseInfoCol}>
-                    <Text style={styles.courseNameText}>{item.courseName}</Text>
-                    <Text style={styles.courseMetaText}>
-                      {item.time} | {item.room}
+                    <Text style={styles.courseNameText} numberOfLines={1}>
+                      {item.courseName}
+                    </Text>
+                    <Text style={styles.courseMetaText} numberOfLines={1}>
+                      {item.className} · {item.room} · {item.date}
                     </Text>
                   </View>
                   <StatusBadge status={item.status} size="sm" />
                 </View>
-              </Card>
+
+                <View style={styles.scheduleFooter}>
+                  <Text style={styles.tapHint}>Ketuk untuk detail</Text>
+                  <View style={styles.timePill}>
+                    <Text style={styles.timePillText}>{item.time}</Text>
+                  </View>
+                </View>
+              </Pressable>
             );
           })}
         </View>
@@ -400,7 +451,9 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
         visible={feedbackModal.visible}
         transparent
         animationType="fade"
-        onRequestClose={() => setFeedbackModal((prev) => ({ ...prev, visible: false }))}>
+        onRequestClose={() =>
+          setFeedbackModal((prev) => ({ ...prev, visible: false }))
+        }>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalCard, APP_SHADOWS.modal]}>
             <View
@@ -412,23 +465,23 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
               ]}>
               <Ionicons
                 name={feedbackModal.success ? 'checkmark-circle' : 'alert-circle'}
-                size={40}
+                size={36}
                 color={
                   feedbackModal.success ? APP_COLORS.opened : APP_COLORS.danger
                 }
               />
             </View>
             <Text style={styles.modalFeedbackTitle}>
-              {feedbackModal.success ? 'Presensi Berhasil!' : 'Presensi Gagal'}
+              {feedbackModal.success ? 'Presensi Berhasil' : 'Presensi Gagal'}
             </Text>
             <Text style={styles.modalFeedbackMessage}>
               {feedbackModal.message}
             </Text>
             {feedbackModal.timestamp ? (
               <View style={styles.modalTimeBox}>
-                <Ionicons name="time-outline" size={16} color={APP_COLORS.primary} />
+                <Ionicons name="time-outline" size={15} color={APP_COLORS.primary} />
                 <Text style={styles.modalTimeText}>
-                  Waktu: {feedbackModal.timestamp}
+                  {feedbackModal.timestamp}
                 </Text>
               </View>
             ) : null}
@@ -436,13 +489,14 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
               title="Tutup"
               variant="primary"
               size="md"
-              onPress={() => setFeedbackModal((prev) => ({ ...prev, visible: false }))}
+              onPress={() =>
+                setFeedbackModal((prev) => ({ ...prev, visible: false }))
+              }
             />
           </View>
         </View>
       </Modal>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role="student"
         activeTab="StudentHome"
@@ -457,205 +511,318 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: APP_COLORS.background,
   },
+  loadingScreen: {
+    flex: 1,
+    paddingHorizontal: APP_SPACING.lg,
+    paddingTop: APP_SPACING.sm,
+  },
+  centeredState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: APP_SPACING.md,
+  },
+  emptyTitle: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 15,
+    color: APP_COLORS.inkPrimary,
+  },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.sm,
+    paddingBottom: APP_SPACING.xxl,
   },
-  greetingRow: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginVertical: APP_SPACING.md,
+    marginBottom: APP_SPACING.lg,
   },
-  greetingTextGroup: {
+  identityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
     marginRight: APP_SPACING.sm,
   },
-  greetingName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-  },
-  greetingRole: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    marginTop: 2,
-  },
-  mainCard: {
-    padding: APP_SPACING.lg,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.md,
-  },
-  mainCardOpen: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#BBF7D0',
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  cardSubtitleLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: APP_COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  courseTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginTop: 2,
-  },
-  courseMeta: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    marginBottom: APP_SPACING.sm,
-  },
-  liveBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DCFCE7',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginVertical: 6,
-  },
-  pulsingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: APP_COLORS.opened,
-    marginRight: 6,
-  },
-  liveBannerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: APP_COLORS.opened,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: APP_COLORS.border,
-    marginVertical: APP_SPACING.md,
-  },
-  ctaContainer: {
-    marginTop: 2,
-  },
-  attendedBox: {
-    alignItems: 'center',
-    paddingVertical: APP_SPACING.xs,
-  },
-  attendedTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  attendedTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.opened,
-  },
-  excusedTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.warning,
-  },
-  timestampText: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: APP_SPACING.md,
-  },
-  attendedBtn: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-  },
-  ctaHint: {
-    fontSize: 12,
-    color: APP_COLORS.textMuted,
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  disabledBox: {
-    alignItems: 'center',
-    gap: 10,
-  },
-  disabledText: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: APP_SPACING.lg,
-    marginBottom: APP_SPACING.sm,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-  },
-  seeAllText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: APP_COLORS.primary,
-  },
-  scheduleList: {
-    gap: APP_SPACING.sm,
-  },
-  scheduleItemCard: {
-    padding: APP_SPACING.md,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-  },
-  scheduleItemSelected: {
-    borderColor: APP_COLORS.primary,
-  },
-  scheduleRowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  courseIndexBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: APP_COLORS.softBlue,
+  avatarCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: APP_COLORS.nordicBreeze,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: APP_SPACING.md,
   },
-  courseIndexText: {
+  avatarInitials: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 15,
+    color: APP_COLORS.tetsuKon,
+  },
+  identityTextGroup: {
+    flex: 1,
+  },
+  userName: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 16,
+    lineHeight: 22,
+    color: APP_COLORS.inkPrimary,
+  },
+  userRole: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    lineHeight: 16,
+    color: APP_COLORS.textSecondary,
+  },
+  notifButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifDot: {
+    position: 'absolute',
+    top: 11,
+    right: 11,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: APP_COLORS.danger,
+    borderWidth: 1.5,
+    borderColor: APP_COLORS.white,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: APP_SPACING.md,
+  },
+  screenTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    color: APP_COLORS.inkPrimary,
+    letterSpacing: -0.3,
+  },
+  sectionHeading: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 17,
+    lineHeight: 22,
+    color: APP_COLORS.inkPrimary,
+  },
+  countLabel: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+  },
+  linkAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    minHeight: 32,
+  },
+  linkActionText: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '700',
     color: APP_COLORS.primary,
+  },
+  scheduleTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: APP_SPACING.md,
+  },
+  scheduleChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    minWidth: 150,
+  },
+  scheduleChipActive: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  scheduleChipTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.inkPrimary,
+  },
+  scheduleChipTitleActive: {
+    color: APP_COLORS.white,
+  },
+  scheduleChipSub: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 11,
+    color: APP_COLORS.textSecondary,
+    marginTop: 2,
+  },
+  scheduleChipSubActive: {
+    color: APP_COLORS.nordicBreeze,
+  },
+  heroCard: {
+    backgroundColor: APP_COLORS.intergalactic,
+    borderRadius: APP_RADIUS.hero,
+    padding: APP_SPACING.xl,
+    marginBottom: APP_SPACING.md,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: APP_SPACING.md,
+  },
+  heroClassPill: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.pill,
+  },
+  heroClassText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.white,
+  },
+  heroCourseTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: APP_COLORS.durantaYellow,
+    marginBottom: 6,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroMetaText: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.88)',
+    flex: 1,
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    marginVertical: APP_SPACING.md,
+  },
+  statusBoxPresent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: APP_COLORS.openedSoft,
+    borderRadius: APP_RADIUS.md,
+    minHeight: 44,
+    paddingHorizontal: APP_SPACING.md,
+  },
+  statusBoxPresentText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.opened,
+  },
+  statusBoxExcused: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: APP_COLORS.warningBg,
+    borderRadius: APP_RADIUS.md,
+    minHeight: 44,
+    paddingHorizontal: APP_SPACING.md,
+  },
+  statusBoxExcusedText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.warning,
+  },
+  heroDisabledPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: APP_RADIUS.md,
+    minHeight: 44,
+    paddingHorizontal: APP_SPACING.md,
+  },
+  heroDisabledText: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 13,
+    color: 'rgba(255, 255, 255, 0.88)',
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: APP_COLORS.border,
+    marginVertical: APP_SPACING.lg,
+  },
+  scheduleList: {
+    gap: APP_SPACING.sm,
+  },
+  scheduleCard: {
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
+    padding: APP_SPACING.lg,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  scheduleCardTint: {
+    backgroundColor: APP_COLORS.nordicBreeze,
+    borderColor: APP_COLORS.nordicBreeze,
+  },
+  scheduleCardSelected: {
+    borderColor: APP_COLORS.primary,
+    borderWidth: 1.5,
+  },
+  scheduleRowTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: APP_SPACING.sm,
+    marginBottom: APP_SPACING.sm,
   },
   courseInfoCol: {
     flex: 1,
   },
   courseNameText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 15,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 2,
   },
   courseMetaText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
   },
+  scheduleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tapHint: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 12,
+    color: APP_COLORS.textMuted,
+  },
+  timePill: {
+    backgroundColor: APP_COLORS.surfaceSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.sm,
+  },
+  timePillText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 11,
+    color: APP_COLORS.inkPrimary,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(23, 24, 75, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: APP_SPACING.xl,
@@ -669,30 +836,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   feedbackIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: APP_SPACING.md,
   },
   feedbackSuccessBox: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: APP_COLORS.openedSoft,
   },
   feedbackErrorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: APP_COLORS.dangerSoft,
   },
   modalFeedbackTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 6,
   },
   modalFeedbackMessage: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 18,
+    lineHeight: 19,
     marginBottom: APP_SPACING.md,
   },
   modalTimeBox: {
@@ -702,35 +870,16 @@ const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.softBlue,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 8,
+    borderRadius: APP_RADIUS.sm,
     marginBottom: APP_SPACING.lg,
   },
   modalTimeText: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 12,
-    fontWeight: '600',
     color: APP_COLORS.primary,
   },
   pressed: {
-    opacity: 0.75,
-  },
-  emptyScheduleState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: APP_SPACING.xl,
-  },
-  emptyScheduleTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    textAlign: 'center',
-  },
-  emptyScheduleText: {
-    marginTop: 8,
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 19,
+    opacity: 0.78,
   },
 });
 
