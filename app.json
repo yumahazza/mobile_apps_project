@@ -37,7 +37,6 @@
       ],
       "expo-status-bar",
       "@react-native-firebase/app",
-      "@react-native-firebase/auth",
       [
         "./plugins/withFirebaseBom.js",
         {

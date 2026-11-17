@@ -47,7 +47,12 @@ const SessionProgressItem: React.FC<{ schedule: PracticumSchedule }> = ({
         <View
           style={[
             styles.progressBarFill,
-            { width: `${Math.max(stats.attendancePercentage > 0 ? 5 : 0, Math.min(100, stats.attendancePercentage))}%` },
+            {
+              width: `${Math.max(
+                0,
+                Math.min(100, stats.attendancePercentage)
+              )}%`,
+            },
           ]}
         />
       </View>

@@ -14,7 +14,6 @@ import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
-import { HeaderRolePicker } from '@/components/HeaderRolePicker';
 import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
@@ -27,168 +26,291 @@ interface ProfileScreenProps {
   navigation: NavigationProp;
 }
 
-export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { activeUser, activeRole, resetDemoData } = useApp();
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  navigation,
+}) => {
+  const {
+    activeUser,
+    activeRole,
+    logout,
+  } = useApp();
 
+  const [loggingOut, setLoggingOut] = useState(false);
   const [activeModal, setActiveModal] = useState<
     'info' | 'settings' | 'help' | null
   >(null);
 
-  const initial = (activeUser.name || 'U').charAt(0).toUpperCase();
+  const initial = (activeUser.name || 'U')
+    .charAt(0)
+    .toUpperCase();
 
-  const handleResetData = () => {
+  const handleLogout = () => {
+    if (loggingOut) return;
+
     Alert.alert(
-      'Reset Data Demo',
-      'Apakah Anda yakin ingin mengembalikan semua jadwal dan status presensi ke data awal?',
+      'Logout',
+      'Yakin ingin keluar dari akun ini?',
       [
         { text: 'Batal', style: 'cancel' },
         {
-          text: 'Ya, Reset',
+          text: 'Logout',
           style: 'destructive',
-          onPress: () => {
-            resetDemoData();
+          onPress: async () => {
+            setLoggingOut(true);
+
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert(
+                'Logout gagal',
+                error instanceof Error
+                  ? error.message
+                  : 'Terjadi kesalahan. Silakan coba lagi.',
+              );
+            } finally {
+              setLoggingOut(false);
+            }
           },
         },
-      ]
+      ],
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={['top', 'left', 'right']}
+    >
       <AppHeader
         title="Profil"
         onBack={() => navigation.goBack()}
-        onNotificationPress={() => navigation.navigate('Notifications')}
+        onNotificationPress={() =>
+          navigation.navigate('Notifications')
+        }
       />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         {/* Profile Card */}
         <Card style={styles.profileCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>{initial}</Text>
+            <Text style={styles.avatarInitial}>
+              {initial}
+            </Text>
           </View>
-          <Text style={styles.userNameText}>{activeUser.name}</Text>
+
+          <Text style={styles.userNameText}>
+            {activeUser.name}
+          </Text>
+
           <Text style={styles.userRoleText}>
             {activeRole === 'assistant'
               ? 'Asisten Praktikum'
               : `NIM ${activeUser.nim || '-'}`}
           </Text>
+
           {activeUser.department ? (
-            <Text style={styles.departmentText}>{activeUser.department}</Text>
+            <Text style={styles.departmentText}>
+              {activeUser.department}
+            </Text>
           ) : null}
         </Card>
 
-        {/* Menu Items List */}
+        {/* Menu Items */}
         <View style={styles.menuList}>
           {/* Informasi Akun */}
           <Pressable
             onPress={() => setActiveModal('info')}
-            style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && styles.pressed,
+            ]}
+          >
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
-                <Ionicons name="person-outline" size={20} color={APP_COLORS.primary} />
+                <Ionicons
+                  name="person-outline"
+                  size={20}
+                  color={APP_COLORS.primary}
+                />
               </View>
-              <Text style={styles.menuLabel}>Informasi Akun</Text>
+              <Text style={styles.menuLabel}>
+                Informasi Akun
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={APP_COLORS.neutral400} />
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={APP_COLORS.neutral400}
+            />
           </Pressable>
 
           {/* Pengaturan */}
           <Pressable
             onPress={() => setActiveModal('settings')}
-            style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && styles.pressed,
+            ]}
+          >
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
-                <Ionicons name="settings-outline" size={20} color={APP_COLORS.primary} />
+                <Ionicons
+                  name="settings-outline"
+                  size={20}
+                  color={APP_COLORS.primary}
+                />
               </View>
-              <Text style={styles.menuLabel}>Pengaturan</Text>
+              <Text style={styles.menuLabel}>
+                Pengaturan
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={APP_COLORS.neutral400} />
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={APP_COLORS.neutral400}
+            />
           </Pressable>
 
           {/* Bantuan */}
           <Pressable
             onPress={() => setActiveModal('help')}
-            style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}>
+            style={({ pressed }) => [
+              styles.menuItem,
+              pressed && styles.pressed,
+            ]}
+          >
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
-                <Ionicons name="help-circle-outline" size={20} color={APP_COLORS.primary} />
+                <Ionicons
+                  name="help-circle-outline"
+                  size={20}
+                  color={APP_COLORS.primary}
+                />
               </View>
-              <Text style={styles.menuLabel}>Bantuan</Text>
+              <Text style={styles.menuLabel}>
+                Bantuan
+              </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={APP_COLORS.neutral400} />
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={APP_COLORS.neutral400}
+            />
           </Pressable>
 
-          {/* Ganti Akun / Role */}
-          <View style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <View style={styles.menuIconBox}>
-                <Ionicons name="swap-horizontal" size={20} color={APP_COLORS.primary} />
-              </View>
-              <Text style={styles.menuLabel}>Ganti Akun / Peran</Text>
-            </View>
-            <HeaderRolePicker compact />
-          </View>
-
-          {/* Reset Demo Data */}
+          {/* Logout Firebase */}
           <Pressable
-            onPress={handleResetData}
+            onPress={handleLogout}
+            disabled={loggingOut}
             style={({ pressed }) => [
               styles.menuItem,
               styles.resetItem,
               pressed && styles.pressed,
-            ]}>
+              loggingOut && styles.disabledItem,
+            ]}
+          >
             <View style={styles.menuLeft}>
-              <View style={[styles.menuIconBox, styles.resetIconBox]}>
-                <Ionicons name="refresh-outline" size={20} color={APP_COLORS.danger} />
+              <View
+                style={[
+                  styles.menuIconBox,
+                  styles.resetIconBox,
+                ]}
+              >
+                <Ionicons
+                  name="log-out-outline"
+                  size={20}
+                  color={APP_COLORS.danger}
+                />
               </View>
-              <Text style={[styles.menuLabel, styles.resetLabel]}>
-                Reset Data Demo
+
+              <Text
+                style={[
+                  styles.menuLabel,
+                  styles.resetLabel,
+                ]}
+              >
+                {loggingOut
+                  ? 'Sedang logout...'
+                  : 'Logout'}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={APP_COLORS.danger} />
+
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={APP_COLORS.danger}
+            />
           </Pressable>
         </View>
       </ScrollView>
 
-      {/* Info Modal */}
+      {/* Informasi Akun Modal */}
       <Modal
         visible={activeModal === 'info'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}>
+        onRequestClose={() => setActiveModal(null)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Informasi Akun</Text>
+            <Text style={styles.modalTitle}>
+              Informasi Akun
+            </Text>
+
             <View style={styles.infoModalList}>
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Nama Lengkap</Text>
-                <Text style={styles.infoModalVal}>{activeUser.name}</Text>
-              </View>
-              <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Peran</Text>
+                <Text style={styles.infoModalLabel}>
+                  Nama Lengkap
+                </Text>
                 <Text style={styles.infoModalVal}>
-                  {activeRole === 'assistant' ? 'Asisten Praktikum' : 'Praktikan'}
+                  {activeUser.name}
                 </Text>
               </View>
-              {activeUser.nim && (
-                <View style={styles.infoModalRow}>
-                  <Text style={styles.infoModalLabel}>NIM</Text>
-                  <Text style={styles.infoModalVal}>{activeUser.nim}</Text>
-                </View>
-              )}
+
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Email</Text>
-                <Text style={styles.infoModalVal}>{activeUser.email || '-'}</Text>
+                <Text style={styles.infoModalLabel}>
+                  Peran
+                </Text>
+                <Text style={styles.infoModalVal}>
+                  {activeRole === 'assistant'
+                    ? 'Asisten Praktikum'
+                    : 'Praktikan'}
+                </Text>
               </View>
+
+              {activeUser.nim ? (
+                <View style={styles.infoModalRow}>
+                  <Text style={styles.infoModalLabel}>
+                    NIM
+                  </Text>
+                  <Text style={styles.infoModalVal}>
+                    {activeUser.nim}
+                  </Text>
+                </View>
+              ) : null}
+
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Departemen</Text>
-                <Text style={styles.infoModalVal}>{activeUser.department || '-'}</Text>
+                <Text style={styles.infoModalLabel}>
+                  Email
+                </Text>
+                <Text style={styles.infoModalVal}>
+                  {activeUser.email || '-'}
+                </Text>
+              </View>
+
+              <View style={styles.infoModalRow}>
+                <Text style={styles.infoModalLabel}>
+                  Departemen
+                </Text>
+                <Text style={styles.infoModalVal}>
+                  {activeUser.department || '-'}
+                </Text>
               </View>
             </View>
+
             <CustomButton
               title="Tutup"
               variant="primary"
@@ -199,28 +321,45 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Settings Modal */}
+      {/* Pengaturan Modal */}
       <Modal
         visible={activeModal === 'settings'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}>
+        onRequestClose={() => setActiveModal(null)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pengaturan Aplikasi</Text>
-            <Text style={styles.modalSub}>
-              Aplikasi berjalan dalam mode offline/demo akademik lokal.
+            <Text style={styles.modalTitle}>
+              Pengaturan Aplikasi
             </Text>
+
+            <Text style={styles.modalSub}>
+              Aplikasi menggunakan Firebase Authentication
+              untuk pengelolaan akun dan Cloud Firestore
+              untuk penyimpanan data praktikum.
+            </Text>
+
             <View style={styles.infoModalList}>
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Versi Aplikasi</Text>
-                <Text style={styles.infoModalVal}>v1.0.0 (Sprint 1)</Text>
+                <Text style={styles.infoModalLabel}>
+                  Pengembangan
+                </Text>
+                <Text style={styles.infoModalVal}>
+                  Sprint 2
+                </Text>
               </View>
+
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>Lingkungan</Text>
-                <Text style={styles.infoModalVal}>Expo SDK 58 / React Native</Text>
+                <Text style={styles.infoModalLabel}>
+                  Lingkungan
+                </Text>
+                <Text style={styles.infoModalVal}>
+                  Expo / React Native
+                </Text>
               </View>
             </View>
+
             <CustomButton
               title="Selesai"
               variant="primary"
@@ -231,24 +370,42 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Help Modal */}
+      {/* Bantuan Modal */}
       <Modal
         visible={activeModal === 'help'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}>
+        onRequestClose={() => setActiveModal(null)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Panduan Aplikasi PPK</Text>
-            <Text style={styles.helpParagraph}>
-              1. Asisten dapat membuka sesi praktikum untuk mengaktifkan presensi praktikan.
+            <Text style={styles.modalTitle}>
+              Panduan Aplikasi PPK
             </Text>
+
             <Text style={styles.helpParagraph}>
-              2. Praktikan mencatatkan kehadiran dengan menekan {'"Presensi Sekarang"'}.
+              1. Masuk menggunakan akun yang sudah
+              terdaftar di Firebase Authentication.
             </Text>
+
             <Text style={styles.helpParagraph}>
-              3. Gunakan pemilih peran untuk beralih antara akun asisten dan praktikan.
+              2. Asisten dapat mengelola jadwal,
+              membuka sesi praktikum, dan memeriksa
+              data presensi sesuai kewenangannya.
             </Text>
+
+            <Text style={styles.helpParagraph}>
+              3. Praktikan dapat melihat jadwal
+              dan melakukan presensi ketika sesi
+              praktikum dibuka.
+            </Text>
+
+            <Text style={styles.helpParagraph}>
+              4. Fitur yang tersedia mengikuti
+              peran akun pengguna yang tersimpan
+              di Cloud Firestore.
+            </Text>
+
             <CustomButton
               title="Mengerti"
               variant="primary"
@@ -260,11 +417,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab="Profile"
-        onTabChange={(tabKey) => navigation.navigate(tabKey)}
+        onTabChange={(tabKey) =>
+          navigation.navigate(tabKey)
+        }
       />
     </SafeAreaView>
   );
@@ -362,6 +520,9 @@ const styles = StyleSheet.create({
   resetLabel: {
     color: APP_COLORS.danger,
   },
+  disabledItem: {
+    opacity: 0.6,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.55)',
@@ -401,11 +562,15 @@ const styles = StyleSheet.create({
   infoModalLabel: {
     fontSize: 13,
     color: APP_COLORS.textSecondary,
+    flexShrink: 1,
+    marginRight: 12,
   },
   infoModalVal: {
     fontSize: 13,
     fontWeight: '600',
     color: APP_COLORS.navyHeading,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   helpParagraph: {
     fontSize: 13,

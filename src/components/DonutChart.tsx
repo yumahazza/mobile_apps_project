@@ -1,5 +1,7 @@
+
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { APP_COLORS, APP_SPACING } from '@/constants/theme';
 
 export interface DonutChartProps {
@@ -18,65 +20,110 @@ export const DonutChart: React.FC<DonutChartProps> = ({
   size = 130,
 }) => {
   const strokeWidth = 14;
-  const innerSize = size - strokeWidth * 2;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
 
-  // Semantic color for the ring based on percentage
+  // Pastikan persentase berada dalam rentang 0-100.
+  const safePercentage = Number.isFinite(percentage)
+    ? Math.max(0, Math.min(100, percentage))
+    : 0;
+
+  const strokeDashoffset =
+    circumference * (1 - safePercentage / 100);
+
+  // Warna mengikuti persentase kehadiran.
   const ringColor =
-    percentage >= 75
+    safePercentage >= 75
       ? APP_COLORS.success
-      : percentage >= 50
+      : safePercentage >= 50
       ? APP_COLORS.warning
       : APP_COLORS.danger;
 
   return (
     <View style={styles.container}>
-      {/* Donut Visualizer */}
+      {/* Donut chart */}
       <View
-        style={[
-          styles.donutOuter,
-          {
-            width: size,
-            height: size,
-            borderRadius: size / 2,
-            borderWidth: strokeWidth,
-            borderColor: '#E2E8F0',
-            borderTopColor: ringColor,
-            borderRightColor: ringColor,
-            borderBottomColor: percentage > 50 ? ringColor : '#E2E8F0',
-          },
-        ]}>
+        style={{
+          width: size,
+          height: size,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}>
+          {/* Lingkaran latar belakang */}
+          <Circle
+            cx={center}
+            cy={center}
+            r={radius}
+            stroke="#E2E8F0"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+
+          {/* Lingkaran sesuai persentase */}
+          {safePercentage > 0 && (
+            <Circle
+              cx={center}
+              cy={center}
+              r={radius}
+              stroke={ringColor}
+              strokeWidth={strokeWidth}
+              fill="none"
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="butt"
+              rotation={-90}
+              originX={center}
+              originY={center}
+            />
+          )}
+        </Svg>
+
+        {/* Persentase di tengah */}
         <View
-          style={[
-            styles.donutInner,
-            {
-              width: innerSize,
-              height: innerSize,
-              borderRadius: innerSize / 2,
-            },
-          ]}>
-          <Text style={styles.percentText}>{percentage}%</Text>
+          pointerEvents="none"
+          style={styles.percentOverlay}>
+          <Text style={styles.percentText}>
+            {Math.round(safePercentage)}%
+          </Text>
         </View>
       </View>
 
-      {/* Legend List */}
+      {/* Legenda kehadiran */}
       <View style={styles.legendContainer}>
-        {/* Hadir */}
         <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: APP_COLORS.success }]} />
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: APP_COLORS.success },
+            ]}
+          />
           <Text style={styles.legendLabel}>Hadir</Text>
           <Text style={styles.legendValue}>{hadir}</Text>
         </View>
 
-        {/* Izin */}
         <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: APP_COLORS.warning }]} />
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: APP_COLORS.warning },
+            ]}
+          />
           <Text style={styles.legendLabel}>Izin</Text>
           <Text style={styles.legendValue}>{izin}</Text>
         </View>
 
-        {/* Alfa */}
         <View style={styles.legendItem}>
-          <View style={[styles.dot, { backgroundColor: APP_COLORS.danger }]} />
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: APP_COLORS.danger },
+            ]}
+          />
           <Text style={styles.legendLabel}>Alfa</Text>
           <Text style={styles.legendValue}>{alfa}</Text>
         </View>
@@ -95,44 +142,49 @@ const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.white,
     borderRadius: 12,
   },
-  donutOuter: {
+
+  percentOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '-45deg' }],
   },
-  donutInner: {
-    backgroundColor: APP_COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '45deg' }],
-  },
+
   percentText: {
     fontSize: 22,
     fontWeight: '800',
     color: APP_COLORS.navyHeading,
   },
+
   legendContainer: {
     justifyContent: 'center',
     gap: APP_SPACING.md,
     minWidth: 110,
   },
+
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+
   dot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     marginRight: 8,
   },
+
   legendLabel: {
     flex: 1,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
     fontWeight: '500',
   },
+
   legendValue: {
     fontSize: 14,
     fontWeight: '700',

@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Types khusus modul Lintang:
  * - Attendances: presensi praktikan real-time
  * - Feedbacks: pesan & kesan praktikan setelah praktikum
  * - Sentiments: hasil klasifikasi sentimen AI
  */
-import type { FirebaseFirestoreTypes } from '@react-native-firebase/firestore';
+import type { FieldValue, Timestamp } from '@react-native-firebase/firestore';
 
 export type AttendanceStatus = 'Hadir' | 'Izin' | 'Alfa';
 
@@ -19,7 +19,7 @@ export interface AttendanceFirestoreDoc {
   studentId: string; // Firebase Auth UID
   studentName: string;
   nim: string;
-  timestamp: FirebaseFirestoreTypes.FieldValue | FirebaseFirestoreTypes.Timestamp;
+  timestamp: FieldValue | Timestamp;
   date: string;
   status: 'Hadir';
 }
@@ -33,7 +33,7 @@ export interface AttendanceRecordItem {
   timestamp: string; // Tampilan waktu "HH:mm:ss WIB"
   date: string;
   status: AttendanceStatus;
-  rawTimestamp?: FirebaseFirestoreTypes.Timestamp | null;
+  rawTimestamp?: Timestamp | null;
 }
 
 export interface AttendanceStats {
@@ -50,7 +50,7 @@ export interface FeedbackFirestoreDoc {
   studentName: string;
   comment: string;
   sentiment: SentimentLabel;
-  createdAt: FirebaseFirestoreTypes.FieldValue | FirebaseFirestoreTypes.Timestamp;
+  createdAt: FieldValue | Timestamp;
 }
 
 export interface FeedbackRecordItem {

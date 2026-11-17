@@ -17,7 +17,7 @@ import {
   runTransaction,
   serverTimestamp,
   where,
-  type FirebaseFirestoreTypes,
+  type Timestamp,
 } from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import type {
@@ -71,8 +71,8 @@ export function parseFirestoreTimestampToString(
   rawTs: unknown,
   fallbackDate?: string,
 ): { timeStr: string; dateStr: string } {
-  if (rawTs && typeof (rawTs as FirebaseFirestoreTypes.Timestamp).toDate === 'function') {
-    const dateObj = (rawTs as FirebaseFirestoreTypes.Timestamp).toDate();
+  if (rawTs && typeof (rawTs as Timestamp).toDate === 'function') {
+    const dateObj = (rawTs as Timestamp).toDate();
     return {
       timeStr: formatIndonesianTime(dateObj),
       dateStr: formatIndonesianDate(dateObj),
@@ -117,7 +117,7 @@ export async function submitPracticumAttendance(
     authUid = null;
   }
 
-  const effectiveStudentId = authUid || studentId;
+  const effectiveStudentId = authUid;
 
   if (!effectiveStudentId?.trim()) {
     throw new Error(
@@ -161,12 +161,9 @@ export async function submitPracticumAttendance(
     }
 
     // 3. Validasi keikutsertaan mahasiswa
-    if (
-      enrolledStudents.length > 0 &&
-      !enrolledStudents.includes(effectiveStudentId)
-    ) {
+    if (!enrolledStudents.includes(effectiveStudentId)) {
       throw new Error(
-        'Presensi gagal: Akun Anda tidak terdaftar sebagai peserta sesi praktikum ini.',
+        'Anda tidak terdaftar sebagai peserta praktikum pada sesi ini.',
       );
     }
 
@@ -233,7 +230,7 @@ export function subscribeToScheduleAttendances(
           timestamp: timeStr,
           date: dateStr,
           status: (raw.status as 'Hadir' | 'Izin' | 'Alfa') || 'Hadir',
-          rawTimestamp: (raw.timestamp as FirebaseFirestoreTypes.Timestamp) || null,
+          rawTimestamp: (raw.timestamp as Timestamp) || null,
         };
       });
 
@@ -241,7 +238,7 @@ export function subscribeToScheduleAttendances(
       records.sort((a, b) => {
         const timeA = a.rawTimestamp?.toMillis?.() ?? 0;
         const timeB = b.rawTimestamp?.toMillis?.() ?? 0;
-        return timeA - timeB;
+        return timeB - timeA;
       });
 
       onData(records);
@@ -292,7 +289,7 @@ export function subscribeToStudentAttendanceForSchedule(
         timestamp: timeStr,
         date: dateStr,
         status: (raw.status as 'Hadir' | 'Izin' | 'Alfa') || 'Hadir',
-        rawTimestamp: (raw.timestamp as FirebaseFirestoreTypes.Timestamp) || null,
+        rawTimestamp: (raw.timestamp as Timestamp) || null,
       });
     },
     error => {
@@ -340,7 +337,7 @@ export function subscribeToStudentHistory(
           timestamp: timeStr,
           date: dateStr,
           status: (raw.status as 'Hadir' | 'Izin' | 'Alfa') || 'Hadir',
-          rawTimestamp: (raw.timestamp as FirebaseFirestoreTypes.Timestamp) || null,
+          rawTimestamp: (raw.timestamp as Timestamp) || null,
         };
       });
 

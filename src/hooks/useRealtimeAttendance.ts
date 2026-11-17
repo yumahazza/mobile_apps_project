@@ -46,6 +46,7 @@ export function useRealtimeAttendance(
         setError(null);
       },
       err => {
+        setAttendances([]);
         setError(err);
         setLoading(false);
       },

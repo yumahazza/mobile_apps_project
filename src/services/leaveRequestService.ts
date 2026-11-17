@@ -17,7 +17,8 @@ import {
   runTransaction,
   serverTimestamp,
   where,
-  type FirebaseFirestoreTypes,
+  type Timestamp,
+  type Firestore,
 } from '@react-native-firebase/firestore';
 import { getAuth } from '@react-native-firebase/auth';
 import type {
@@ -57,7 +58,7 @@ function notifyLocalListeners() {
   });
 }
 
-function getSafeFirestore(): FirebaseFirestoreTypes.Firestore | null {
+function getSafeFirestore(): Firestore | null {
   try {
     return getFirestore();
   } catch {
@@ -168,7 +169,7 @@ export function mapFirestoreLeaveRequest(
       ? `${reviewedParsed.dateStr} • ${reviewedParsed.timeStr}`
       : null,
     createdAt: `${createdParsed.dateStr} • ${createdParsed.timeStr}`,
-    rawCreatedAt: (raw.createdAt as FirebaseFirestoreTypes.Timestamp) || null,
+    rawCreatedAt: (raw.createdAt as Timestamp) || null,
   };
 }
 
@@ -311,17 +312,10 @@ export async function submitLeaveRequest(
         status: 'MENUNGGU',
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      // Jika error bisnis validasi (sudah izin / sudah hadir / sesi selesai), teruskan errornya
-      if (
-        msg.includes('sudah mengajukan izin') ||
-        msg.includes('sudah tercatat Hadir') ||
-        msg.includes('telah selesai') ||
-        msg.includes('tidak terdaftar')
-      ) {
-        throw err;
-      }
-      // Jika error koneksi native Firebase di Expo Go / Web, lanjutkan ke local store reaktif
+      // Jika transaksi Firestore gagal, tampilkan error sebenarnya.
+      // Jangan menganggap data berhasil disimpan secara lokal.
+      console.error('[submitLeaveRequest] Firestore error:', err);
+      throw err;
     }
   }
 
@@ -427,11 +421,18 @@ export async function reviewLeaveRequest(
             );
           }
         }
-
         const attendanceSnap = await transaction.get(attendanceDocRef);
         const leaveData = leaveSnap.data() as Record<string, unknown>;
 
+        // Pengajuan hanya boleh diputuskan satu kali.
+        if (leaveData.status !== 'MENUNGGU') {
+          throw new Error(
+            'Pengajuan izin ini sudah diproses dan tidak dapat diputuskan ulang.',
+          );
+        }
+
         transaction.update(leaveDocRef, {
+
           status: decision,
           reviewedBy: reviewerLabel,
           reviewedAt: serverTimestamp(),
@@ -442,7 +443,13 @@ export async function reviewLeaveRequest(
             ? String((attendanceSnap.data() as Record<string, unknown>)?.status ?? '')
             : '';
 
-          if (existingAttStatus !== 'Hadir') {
+          if (existingAttStatus === 'Hadir') {
+            throw new Error(
+              'Pengajuan tidak dapat diterima karena praktikan sudah tercatat Hadir.',
+            );
+          }
+
+          if (!attendanceSnap.exists()) {
             transaction.set(attendanceDocRef, {
               scheduleId,
               studentId,
@@ -452,13 +459,6 @@ export async function reviewLeaveRequest(
               date: dateFormatted,
               status: 'Izin',
             });
-          }
-        } else if (decision === 'DITOLAK' && attendanceSnap.exists()) {
-          const existingAttStatus = String(
-            (attendanceSnap.data() as Record<string, unknown>)?.status ?? '',
-          );
-          if (existingAttStatus === 'Izin') {
-            transaction.delete(attendanceDocRef);
           }
         }
       });
@@ -473,10 +473,8 @@ export async function reviewLeaveRequest(
         status: decision,
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg.includes('Akses ditolak') || msg.includes('tidak ditemukan')) {
-        throw err;
-      }
+      console.error('[reviewLeaveRequest] Firestore error:', err);
+      throw err;
     }
   }
 
