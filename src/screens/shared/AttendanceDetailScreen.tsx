@@ -19,6 +19,7 @@ import type { Schedule } from '@/data/schedules';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -49,8 +50,8 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
         <View style={styles.emptyWrapper}>
           <EmptyState
             icon="document-text-outline"
-            title="Detail Kehadiran Tidak Tersedia"
-            description="Pilih salah satu catatan kehadiran dari rekap sesi atau riwayat presensi."
+            title="Detail Tidak Tersedia"
+            description="Pilih catatan kehadiran dari rekap atau riwayat."
             actionTitle="Kembali"
             onActionPress={() => navigation.goBack()}
           />
@@ -68,24 +69,26 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
   const isAlfa = record.status === 'Alfa';
 
   const methodText = isExcused
-    ? 'Pengajuan Izin (Disetujui Asisten)'
+    ? 'Izin Disetujui Asisten'
     : isAlfa
     ? 'Belum Tercatat'
-    : 'Presensi Mandiri (Mobile App)';
+    : 'Presensi Mandiri';
 
   const noteText = isExcused
-    ? 'Izin ketidakhadiran disetujui oleh asisten'
+    ? 'Izin ketidakhadiran disetujui'
     : isAlfa
-    ? 'Tidak melakukan presensi pada sesi ini'
-    : 'Kehadiran tercatat pada sesi berlangsung';
+    ? 'Tidak melakukan presensi'
+    : 'Hadir pada sesi berlangsung';
 
-  const calloutText = isExcused
-    ? 'Status Izin ini disinkronkan secara otomatis dari persetujuan asisten di Cloud Firestore.'
-    : 'Presensi tercatat dengan benar dan telah tersimpan di Cloud Firestore.';
+  const initials = (record.studentName || 'M')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Detail Presensi"
         onBack={() => navigation.goBack()}
@@ -95,20 +98,17 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Student Avatar Card */}
         <Card style={styles.studentCard}>
           <View style={styles.avatarCircle}>
-            <Ionicons name="person" size={32} color={APP_COLORS.primary} />
+            <Text style={styles.avatarInitials}>{initials}</Text>
           </View>
           <Text style={styles.studentNameText}>{record.studentName}</Text>
           <Text style={styles.studentNimText}>NIM {record.nim}</Text>
         </Card>
 
-        {/* Attendance Information Card */}
         <Card style={styles.infoCard}>
           <Text style={styles.infoCardTitle}>Informasi Kehadiran</Text>
 
-          {/* Praktikum */}
           {schedule && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Praktikum</Text>
@@ -116,50 +116,47 @@ export const AttendanceDetailScreen: React.FC<AttendanceDetailScreenProps> = ({
             </View>
           )}
 
-          {/* Status */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Status</Text>
             <StatusBadge status={record.status} size="sm" />
           </View>
 
-          {/* Waktu Presensi */}
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Waktu Tercatat</Text>
+            <Text style={styles.detailLabel}>Waktu</Text>
             <Text style={styles.detailValue}>{record.timestamp}</Text>
           </View>
 
-          {/* Tanggal */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Tanggal</Text>
             <Text style={styles.detailValue}>{record.date}</Text>
           </View>
 
-          {/* Metode */}
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Metode</Text>
             <Text style={styles.detailValue}>{methodText}</Text>
           </View>
 
-          {/* Keterangan */}
           <View style={[styles.detailRow, styles.lastRow]}>
             <Text style={styles.detailLabel}>Keterangan</Text>
             <Text style={styles.detailValue}>{noteText}</Text>
           </View>
         </Card>
 
-        {/* Blue Info Confirmation Callout */}
         <View style={styles.infoCallout}>
           <Ionicons
-            name="information-circle"
-            size={20}
+            name="information-circle-outline"
+            size={18}
             color={APP_COLORS.primary}
             style={styles.infoIcon}
           />
-          <Text style={styles.infoCalloutText}>{calloutText}</Text>
+          <Text style={styles.infoCalloutText}>
+            {isExcused
+              ? 'Status izin disinkronkan dari persetujuan asisten.'
+              : 'Data kehadiran tersimpan di sistem presensi.'}
+          </Text>
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab={activeRole === 'assistant' ? 'SessionRecap' : 'StudentHistory'}
@@ -176,8 +173,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   emptyWrapper: {
     flex: 1,
@@ -187,7 +184,7 @@ const styles = StyleSheet.create({
   studentCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: APP_SPACING.xxl,
+    paddingVertical: APP_SPACING.xl,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -195,21 +192,27 @@ const styles = StyleSheet.create({
     marginBottom: APP_SPACING.md,
   },
   avatarCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: APP_COLORS.softBlue,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: APP_COLORS.nordicBreeze,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: APP_SPACING.md,
   },
+  avatarInitials: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    color: APP_COLORS.tetsuKon,
+  },
   studentNameText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: 4,
+    color: APP_COLORS.inkPrimary,
+    marginBottom: 2,
   },
   studentNimText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
@@ -219,41 +222,43 @@ const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.lg,
+    marginBottom: APP_SPACING.md,
   },
   infoCardTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: APP_SPACING.md,
+    color: APP_COLORS.inkPrimary,
+    marginBottom: APP_SPACING.sm,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 10,
+    gap: APP_SPACING.md,
+    paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: APP_COLORS.divider,
   },
   lastRow: {
     borderBottomWidth: 0,
   },
   detailLabel: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
   detailValue: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   infoCallout: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: APP_COLORS.softBlue,
-    borderWidth: 1,
-    borderColor: APP_COLORS.lightBlue,
-    borderRadius: 10,
+    borderRadius: APP_RADIUS.md,
     padding: APP_SPACING.md,
   },
   infoIcon: {
@@ -261,8 +266,9 @@ const styles = StyleSheet.create({
   },
   infoCalloutText: {
     flex: 1,
+    fontFamily: APP_FONTS.regular,
     fontSize: 12,
-    color: APP_COLORS.textPrimary,
+    color: APP_COLORS.textSecondary,
     lineHeight: 18,
   },
 });

@@ -46,5 +46,6 @@ example
 /ios
 /android
 
-
+*.png
+*.agents
 *.md

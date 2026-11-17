@@ -1,7 +1,6 @@
 /**
  * ConfirmModal Component
- * SRS-UI-002: Reusable confirmation modal dialog
- * Follows DSG.md Section 17 (Confirmation Modal)
+ * Reusable confirmation modal dialog aligned with DESIGN_ANTI_AI_SLOP_GUIDELINES.md
  */
 
 import React from 'react';
@@ -12,7 +11,13 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from 'react-native';
-import { APP_COLORS, APP_RADIUS, APP_SPACING, APP_SHADOWS } from '@/constants/theme';
+import {
+  APP_COLORS,
+  APP_FONTS,
+  APP_RADIUS,
+  APP_SPACING,
+  APP_SHADOWS,
+} from '@/constants/theme';
 import { CustomButton, ButtonVariant } from '@/components/CustomButton';
 
 export interface ConfirmModalProps {
@@ -56,16 +61,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={[styles.dialog, APP_SHADOWS.modal]} accessibilityViewIsModal>
-              {/* Header */}
               <Text style={styles.title}>{title}</Text>
 
-              {/* Course Info Card (if provided) */}
               {details && (
                 <View style={styles.detailsCard}>
                   {details.courseName && (
                     <Text style={styles.detailsTitle}>
                       {details.courseName}
-                      {details.className ? ` — ${details.className}` : ''}
+                      {details.className ? ` · ${details.className}` : ''}
                     </Text>
                   )}
                   {details.time && (
@@ -77,10 +80,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                 </View>
               )}
 
-              {/* Subtitle / Consequences */}
               {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
 
-              {/* Actions */}
               <View style={styles.actionsRow}>
                 <View style={styles.actionBtnWrapper}>
                   <CustomButton
@@ -112,53 +113,58 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(23, 24, 75, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: APP_SPACING.xxl,
+    padding: APP_SPACING.xl,
   },
   dialog: {
     width: '100%',
     maxWidth: 400,
     maxHeight: '90%',
     backgroundColor: APP_COLORS.white,
-    borderRadius: APP_RADIUS.xl,
-    padding: APP_SPACING.xxl,
+    borderRadius: APP_RADIUS.modal,
+    padding: APP_SPACING.xl,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: APP_COLORS.neutral950,
-    marginBottom: APP_SPACING.sm,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 18,
+    lineHeight: 24,
+    color: APP_COLORS.inkPrimary,
+    marginBottom: APP_SPACING.xs,
   },
   subtitle: {
-    fontSize: 14,
-    color: APP_COLORS.neutral700,
-    lineHeight: 20,
-    marginBottom: APP_SPACING.xl,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
+    lineHeight: 19,
+    marginBottom: APP_SPACING.lg,
   },
   detailsCard: {
-    backgroundColor: APP_COLORS.primary50,
-    borderColor: APP_COLORS.primary100,
+    backgroundColor: APP_COLORS.surfaceSubtle,
+    borderColor: APP_COLORS.border,
     borderWidth: 1,
     borderRadius: APP_RADIUS.md,
     padding: APP_SPACING.md,
-    marginVertical: APP_SPACING.md,
+    marginVertical: APP_SPACING.sm,
   },
   detailsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: APP_COLORS.neutral950,
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 2,
   },
   detailsSub: {
-    fontSize: 13,
-    color: APP_COLORS.neutral500,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: APP_SPACING.md,
-    marginTop: APP_SPACING.sm,
+    gap: APP_SPACING.sm,
+    marginTop: APP_SPACING.xs,
   },
   actionBtnWrapper: {
     flex: 1,
@@ -166,4 +172,3 @@ const styles = StyleSheet.create({
 });
 
 export default ConfirmModal;
-

@@ -1,9 +1,9 @@
-
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -24,8 +24,8 @@ interface EmptyStateProps {
 export const EmptyState: React.FC<EmptyStateProps> = ({
   icon,
   iconName,
-  iconColor = APP_COLORS.neutral500,
-  iconBgColor = APP_COLORS.neutral100,
+  iconColor = APP_COLORS.textSecondary,
+  iconBgColor = APP_COLORS.softBlue,
   badge,
   title,
   description,
@@ -45,7 +45,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       >
         <Ionicons
           name={resolvedIcon}
-          size={40}
+          size={32}
           color={iconColor}
         />
       </View>
@@ -91,49 +91,50 @@ const styles = StyleSheet.create({
   container: {
     width: '100%',
     alignSelf: 'center',
-    padding: APP_SPACING.xxl,
+    padding: APP_SPACING.xl,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: APP_COLORS.white,
-    borderRadius: APP_RADIUS.lg,
+    borderRadius: APP_RADIUS.card,
     borderWidth: 1,
-    borderColor: APP_COLORS.neutral200,
-    marginVertical: APP_SPACING.md,
+    borderColor: APP_COLORS.border,
+    marginVertical: APP_SPACING.sm,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: APP_RADIUS.pill,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: APP_SPACING.md,
   },
   badge: {
-    backgroundColor: APP_COLORS.primary50,
+    backgroundColor: APP_COLORS.softBlue,
     paddingHorizontal: APP_SPACING.md,
     paddingVertical: APP_SPACING.xs,
     borderRadius: APP_RADIUS.pill,
     marginBottom: APP_SPACING.sm,
   },
   badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 11,
     color: APP_COLORS.primary,
     textAlign: 'center',
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.neutral950,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 15,
+    color: APP_COLORS.inkPrimary,
     marginBottom: APP_SPACING.xs,
     textAlign: 'center',
   },
   description: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
-    color: APP_COLORS.neutral700,
+    color: APP_COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 320,
+    lineHeight: 19,
+    maxWidth: 300,
   },
   hintContainer: {
     flexDirection: 'row',
@@ -142,17 +143,19 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: APP_SPACING.md,
     padding: APP_SPACING.md,
-    backgroundColor: APP_COLORS.primary50,
+    backgroundColor: APP_COLORS.softBlue,
     borderRadius: APP_RADIUS.md,
   },
   hintText: {
     flex: 1,
+    fontFamily: APP_FONTS.regular,
     fontSize: 12,
-    lineHeight: 18,
-    color: APP_COLORS.neutral700,
+    lineHeight: 17,
+    color: APP_COLORS.textSecondary,
   },
   actionButton: {
-    marginTop: APP_SPACING.lg,
+    marginTop: APP_SPACING.md,
+    minHeight: 42,
     paddingHorizontal: APP_SPACING.lg,
     paddingVertical: APP_SPACING.sm,
     backgroundColor: APP_COLORS.primary,
@@ -161,11 +164,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionButtonPressed: {
-    opacity: 0.75,
+    opacity: 0.78,
   },
   actionButtonText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '600',
     color: APP_COLORS.white,
   },
 });

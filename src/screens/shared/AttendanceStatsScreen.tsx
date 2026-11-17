@@ -20,6 +20,7 @@ import { NavigationProp } from '@/navigation/navigationTypes';
 import type { PracticumSchedule } from '@/services/practicumScheduleService';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -28,9 +29,6 @@ interface AttendanceStatsScreenProps {
   navigation: NavigationProp;
 }
 
-/**
- * Item progress bar per sesi yang terhubung langsung ke Firestore
- */
 const SessionProgressItem: React.FC<{ schedule: PracticumSchedule }> = ({
   schedule,
 }) => {
@@ -42,7 +40,9 @@ const SessionProgressItem: React.FC<{ schedule: PracticumSchedule }> = ({
   return (
     <Card style={styles.barCard}>
       <View style={styles.barLabelRow}>
-        <Text style={styles.barCourseName}>{schedule.courseName}</Text>
+        <Text style={styles.barCourseName} numberOfLines={1}>
+          {schedule.courseName}
+        </Text>
         <Text style={styles.barPercentText}>{stats.attendancePercentage}%</Text>
       </View>
       <View style={styles.progressBarTrack}>
@@ -52,17 +52,15 @@ const SessionProgressItem: React.FC<{ schedule: PracticumSchedule }> = ({
             {
               width: `${Math.max(
                 0,
-                Math.min(100, stats.attendancePercentage)
+                Math.min(100, stats.attendancePercentage),
               )}%`,
             },
           ]}
         />
       </View>
-      <View style={styles.barDetailsRow}>
-        <Text style={styles.barDetailsText}>
-          {stats.hadirCount} hadir • {stats.izinCount} izin • {stats.alfaCount} belum hadir (dari {stats.totalRegistered} mahasiswa)
-        </Text>
-      </View>
+      <Text style={styles.barDetailsText}>
+        {stats.hadirCount} hadir · {stats.izinCount} izin · {stats.alfaCount} alfa
+      </Text>
     </Card>
   );
 };
@@ -94,7 +92,6 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Statistik Kehadiran"
         onBack={() => navigation.goBack()}
@@ -107,7 +104,7 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
         {schedulesLoading ? (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color={APP_COLORS.primary} />
-            <Text style={styles.stateText}>Memuat statistik kehadiran...</Text>
+            <Text style={styles.stateText}>Memuat statistik...</Text>
           </View>
         ) : schedulesError ? (
           <EmptyState
@@ -118,12 +115,11 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
         ) : !currentSchedule ? (
           <EmptyState
             icon="stats-chart-outline"
-            title="Belum Ada Statistik Kehadiran"
-            description="Statistik per sesi akan muncul setelah Anda memiliki jadwal praktikum."
+            title="Belum Ada Statistik"
+            description="Statistik muncul setelah ada jadwal praktikum."
           />
         ) : (
           <>
-            {/* Session Info Card */}
             <Card style={styles.sessionCard}>
               <View style={styles.sessionRow}>
                 <View style={styles.iconBox}>
@@ -132,13 +128,12 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
                 <View style={styles.sessionTextCol}>
                   <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
                   <Text style={styles.sessionMeta}>
-                    {currentSchedule.time} | {currentSchedule.room}
+                    {currentSchedule.time} · {currentSchedule.room}
                   </Text>
                 </View>
               </View>
             </Card>
 
-            {/* Donut Chart Card */}
             <Card style={styles.chartCard}>
               <DonutChart
                 percentage={stats.attendancePercentage}
@@ -148,7 +143,6 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
               />
             </Card>
 
-            {/* Section Per Sesi (Horizontal Progress Bars) */}
             <View style={styles.perSessionSection}>
               <Text style={styles.sectionTitle}>Per Sesi</Text>
 
@@ -162,7 +156,6 @@ export const AttendanceStatsScreen: React.FC<AttendanceStatsScreenProps> = ({
         )}
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab="SessionRecap"
@@ -179,8 +172,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   stateBox: {
     alignItems: 'center',
@@ -189,11 +182,12 @@ const styles = StyleSheet.create({
     gap: APP_SPACING.sm,
   },
   stateText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
   sessionCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -207,7 +201,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: APP_COLORS.softBlue,
     alignItems: 'center',
     justifyContent: 'center',
@@ -217,12 +211,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   courseName: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 2,
   },
   sessionMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
   },
@@ -237,16 +232,16 @@ const styles = StyleSheet.create({
     marginBottom: APP_SPACING.md,
   },
   sectionTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: APP_SPACING.sm,
   },
   barsList: {
     gap: APP_SPACING.sm,
   },
   barCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -257,34 +252,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 8,
+    gap: 8,
   },
   barCourseName: {
+    flex: 1,
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 14,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   barPercentText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '700',
-    color: APP_COLORS.accentBlue,
+    color: APP_COLORS.primary,
   },
   progressBarTrack: {
     height: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: APP_COLORS.neutral100,
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: APP_COLORS.accentBlue,
+    backgroundColor: APP_COLORS.primary,
     borderRadius: 4,
   },
-  barDetailsRow: {
-    marginTop: 6,
-  },
   barDetailsText: {
-    fontSize: 11,
-    color: APP_COLORS.textMuted,
+    marginTop: 6,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
   },
 });
 

@@ -18,7 +18,9 @@ import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
+  APP_SHADOWS,
   APP_SPACING,
 } from '@/constants/theme';
 
@@ -40,16 +42,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     'info' | 'settings' | 'help' | null
   >(null);
 
-  const initial = (activeUser.name || 'U')
-    .charAt(0)
-    .toUpperCase();
+  const initials = (activeUser.name || 'U')
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
 
   const handleLogout = () => {
     if (loggingOut) return;
 
     Alert.alert(
       'Logout',
-      'Yakin ingin keluar dari akun ini?',
+      'Keluar dari akun ini?',
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -79,8 +84,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   return (
     <SafeAreaView
       style={styles.safeArea}
-      edges={['top', 'left', 'right']}
-    >
+      edges={['top', 'left', 'right']}>
       <AppHeader
         title="Profil"
         onBack={() => navigation.goBack()}
@@ -91,117 +95,95 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Profile Card */}
+        showsVerticalScrollIndicator={false}>
         <Card style={styles.profileCard}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitial}>
-              {initial}
-            </Text>
+            <Text style={styles.avatarInitial}>{initials}</Text>
           </View>
 
-          <Text style={styles.userNameText}>
-            {activeUser.name}
-          </Text>
+          <Text style={styles.userNameText}>{activeUser.name}</Text>
 
           <Text style={styles.userRoleText}>
             {activeRole === 'assistant'
               ? 'Asisten Praktikum'
-              : `NIM ${activeUser.nim || '-'}`}
+              : `Praktikan · NIM ${activeUser.nim || '-'}`}
           </Text>
 
           {activeUser.department ? (
-            <Text style={styles.departmentText}>
-              {activeUser.department}
-            </Text>
+            <Text style={styles.departmentText}>{activeUser.department}</Text>
           ) : null}
         </Card>
 
-        {/* Menu Items */}
         <View style={styles.menuList}>
-          {/* Informasi Akun */}
           <Pressable
             onPress={() => setActiveModal('info')}
             style={({ pressed }) => [
               styles.menuItem,
               pressed && styles.pressed,
-            ]}
-          >
+            ]}>
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
                 <Ionicons
                   name="person-outline"
-                  size={20}
+                  size={19}
                   color={APP_COLORS.primary}
                 />
               </View>
-              <Text style={styles.menuLabel}>
-                Informasi Akun
-              </Text>
+              <Text style={styles.menuLabel}>Informasi Akun</Text>
             </View>
             <Ionicons
               name="chevron-forward"
               size={18}
-              color={APP_COLORS.neutral400}
+              color={APP_COLORS.textMuted}
             />
           </Pressable>
 
-          {/* Pengaturan */}
           <Pressable
             onPress={() => setActiveModal('settings')}
             style={({ pressed }) => [
               styles.menuItem,
               pressed && styles.pressed,
-            ]}
-          >
+            ]}>
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
                 <Ionicons
                   name="settings-outline"
-                  size={20}
+                  size={19}
                   color={APP_COLORS.primary}
                 />
               </View>
-              <Text style={styles.menuLabel}>
-                Pengaturan
-              </Text>
+              <Text style={styles.menuLabel}>Pengaturan</Text>
             </View>
             <Ionicons
               name="chevron-forward"
               size={18}
-              color={APP_COLORS.neutral400}
+              color={APP_COLORS.textMuted}
             />
           </Pressable>
 
-          {/* Bantuan */}
           <Pressable
             onPress={() => setActiveModal('help')}
             style={({ pressed }) => [
               styles.menuItem,
               pressed && styles.pressed,
-            ]}
-          >
+            ]}>
             <View style={styles.menuLeft}>
               <View style={styles.menuIconBox}>
                 <Ionicons
                   name="help-circle-outline"
-                  size={20}
+                  size={19}
                   color={APP_COLORS.primary}
                 />
               </View>
-              <Text style={styles.menuLabel}>
-                Bantuan
-              </Text>
+              <Text style={styles.menuLabel}>Bantuan</Text>
             </View>
             <Ionicons
               name="chevron-forward"
               size={18}
-              color={APP_COLORS.neutral400}
+              color={APP_COLORS.textMuted}
             />
           </Pressable>
 
-          {/* Logout Firebase */}
           <Pressable
             onPress={handleLogout}
             disabled={loggingOut}
@@ -210,31 +192,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               styles.resetItem,
               pressed && styles.pressed,
               loggingOut && styles.disabledItem,
-            ]}
-          >
+            ]}>
             <View style={styles.menuLeft}>
-              <View
-                style={[
-                  styles.menuIconBox,
-                  styles.resetIconBox,
-                ]}
-              >
+              <View style={[styles.menuIconBox, styles.resetIconBox]}>
                 <Ionicons
                   name="log-out-outline"
-                  size={20}
+                  size={19}
                   color={APP_COLORS.danger}
                 />
               </View>
 
-              <Text
-                style={[
-                  styles.menuLabel,
-                  styles.resetLabel,
-                ]}
-              >
-                {loggingOut
-                  ? 'Sedang logout...'
-                  : 'Logout'}
+              <Text style={[styles.menuLabel, styles.resetLabel]}>
+                {loggingOut ? 'Sedang logout...' : 'Logout'}
               </Text>
             </View>
 
@@ -252,59 +221,38 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         visible={activeModal === 'info'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}
-      >
+        onRequestClose={() => setActiveModal(null)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Informasi Akun
-            </Text>
+          <View style={[styles.modalContent, APP_SHADOWS.modal]}>
+            <Text style={styles.modalTitle}>Informasi Akun</Text>
 
             <View style={styles.infoModalList}>
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Nama Lengkap
-                </Text>
-                <Text style={styles.infoModalVal}>
-                  {activeUser.name}
-                </Text>
+                <Text style={styles.infoModalLabel}>Nama Lengkap</Text>
+                <Text style={styles.infoModalVal}>{activeUser.name}</Text>
               </View>
 
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Peran
-                </Text>
+                <Text style={styles.infoModalLabel}>Peran</Text>
                 <Text style={styles.infoModalVal}>
-                  {activeRole === 'assistant'
-                    ? 'Asisten Praktikum'
-                    : 'Praktikan'}
+                  {activeRole === 'assistant' ? 'Asisten Praktikum' : 'Praktikan'}
                 </Text>
               </View>
 
               {activeUser.nim ? (
                 <View style={styles.infoModalRow}>
-                  <Text style={styles.infoModalLabel}>
-                    NIM
-                  </Text>
-                  <Text style={styles.infoModalVal}>
-                    {activeUser.nim}
-                  </Text>
+                  <Text style={styles.infoModalLabel}>NIM</Text>
+                  <Text style={styles.infoModalVal}>{activeUser.nim}</Text>
                 </View>
               ) : null}
 
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Email
-                </Text>
-                <Text style={styles.infoModalVal}>
-                  {activeUser.email || '-'}
-                </Text>
+                <Text style={styles.infoModalLabel}>Email</Text>
+                <Text style={styles.infoModalVal}>{activeUser.email || '-'}</Text>
               </View>
 
-              <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Departemen
-                </Text>
+              <View style={[styles.infoModalRow, styles.lastModalRow]}>
+                <Text style={styles.infoModalLabel}>Departemen</Text>
                 <Text style={styles.infoModalVal}>
                   {activeUser.department || '-'}
                 </Text>
@@ -326,37 +274,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         visible={activeModal === 'settings'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}
-      >
+        onRequestClose={() => setActiveModal(null)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Pengaturan Aplikasi
-            </Text>
-
+          <View style={[styles.modalContent, APP_SHADOWS.modal]}>
+            <Text style={styles.modalTitle}>Pengaturan</Text>
             <Text style={styles.modalSub}>
-              Aplikasi menggunakan Firebase Authentication
-              untuk pengelolaan akun dan Cloud Firestore
-              untuk penyimpanan data praktikum.
+              Akun dan data praktikum disinkronkan secara real-time.
             </Text>
 
             <View style={styles.infoModalList}>
               <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Pengembangan
-                </Text>
-                <Text style={styles.infoModalVal}>
-                  Sprint 2
-                </Text>
+                <Text style={styles.infoModalLabel}>Versi</Text>
+                <Text style={styles.infoModalVal}>1.0.0</Text>
               </View>
 
-              <View style={styles.infoModalRow}>
-                <Text style={styles.infoModalLabel}>
-                  Lingkungan
-                </Text>
-                <Text style={styles.infoModalVal}>
-                  Expo / React Native
-                </Text>
+              <View style={[styles.infoModalRow, styles.lastModalRow]}>
+                <Text style={styles.infoModalLabel}>Platform</Text>
+                <Text style={styles.infoModalVal}>Expo / React Native</Text>
               </View>
             </View>
 
@@ -375,35 +309,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         visible={activeModal === 'help'}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveModal(null)}
-      >
+        onRequestClose={() => setActiveModal(null)}>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              Panduan Aplikasi PPK
-            </Text>
+          <View style={[styles.modalContent, APP_SHADOWS.modal]}>
+            <Text style={styles.modalTitle}>Panduan Penggunaan</Text>
 
             <Text style={styles.helpParagraph}>
-              1. Masuk menggunakan akun yang sudah
-              terdaftar di Firebase Authentication.
+              1. Masuk menggunakan akun terdaftar.
             </Text>
-
             <Text style={styles.helpParagraph}>
-              2. Asisten dapat mengelola jadwal,
-              membuka sesi praktikum, dan memeriksa
-              data presensi sesuai kewenangannya.
+              2. Asisten mengelola jadwal, membuka sesi, memeriksa izin, dan melihat ulasan AI.
             </Text>
-
             <Text style={styles.helpParagraph}>
-              3. Praktikan dapat melihat jadwal
-              dan melakukan presensi ketika sesi
-              praktikum dibuka.
-            </Text>
-
-            <Text style={styles.helpParagraph}>
-              4. Fitur yang tersedia mengikuti
-              peran akun pengguna yang tersimpan
-              di Cloud Firestore.
+              3. Praktikan melakukan presensi saat sesi dibuka, mengajukan izin, dan mengirim ulasan setelah sesi selesai.
             </Text>
 
             <CustomButton
@@ -420,9 +338,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       <BottomNavigation
         role={activeRole}
         activeTab="Profile"
-        onTabChange={(tabKey) =>
-          navigation.navigate(tabKey)
-        }
+        onTabChange={(tabKey) => navigation.navigate(tabKey)}
       />
     </SafeAreaView>
   );
@@ -435,13 +351,13 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   profileCard: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: APP_SPACING.xxl,
+    paddingVertical: APP_SPACING.xl,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -449,31 +365,33 @@ const styles = StyleSheet.create({
     marginBottom: APP_SPACING.lg,
   },
   avatarCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: APP_COLORS.primary,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: APP_COLORS.nordicBreeze,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: APP_SPACING.md,
   },
   avatarInitial: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: APP_COLORS.white,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 22,
+    color: APP_COLORS.tetsuKon,
   },
   userNameText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: 4,
+    color: APP_COLORS.inkPrimary,
+    marginBottom: 2,
   },
   userRoleText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
     marginBottom: 2,
   },
   departmentText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 12,
     color: APP_COLORS.textMuted,
   },
@@ -488,44 +406,45 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: APP_SPACING.md,
+    minHeight: 54,
+    paddingVertical: 12,
+    paddingHorizontal: APP_SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: APP_COLORS.divider,
   },
   menuLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   menuIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
     backgroundColor: APP_COLORS.softBlue,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: APP_SPACING.md,
   },
   menuLabel: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 14,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   resetItem: {
     borderBottomWidth: 0,
   },
   resetIconBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: APP_COLORS.dangerSoft,
   },
   resetLabel: {
-    color: APP_COLORS.danger,
+    color: APP_COLORS.dangerText,
   },
   disabledItem: {
     opacity: 0.6,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    backgroundColor: 'rgba(23, 24, 75, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: APP_SPACING.xl,
@@ -538,48 +457,54 @@ const styles = StyleSheet.create({
     padding: APP_SPACING.xl,
   },
   modalTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 8,
   },
   modalSub: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
+    lineHeight: 19,
     marginBottom: APP_SPACING.md,
   },
   infoModalList: {
-    gap: APP_SPACING.sm,
     marginBottom: APP_SPACING.lg,
   },
   infoModalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 6,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: APP_COLORS.divider,
+  },
+  lastModalRow: {
+    borderBottomWidth: 0,
   },
   infoModalLabel: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
     flexShrink: 1,
     marginRight: 12,
   },
   infoModalVal: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     flexShrink: 1,
     textAlign: 'right',
   },
   helpParagraph: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
-    color: APP_COLORS.textPrimary,
+    color: APP_COLORS.inkPrimary,
     lineHeight: 20,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   pressed: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: APP_COLORS.surfaceSubtle,
   },
 });
 

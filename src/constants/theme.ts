@@ -1,25 +1,35 @@
 /**
- * Design tokens and theme definitions based on DSG.md
+ * Design tokens and theme definitions aligned with DESIGN_ANTI_AI_SLOP_GUIDELINES.md
+ * Palette source: assets/palette/image 12.png (MP067) + WCAG AA semantic status tokens.
+ * Font family: Sora (@expo-google-fonts/sora).
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
+export const APP_FONTS = {
+  regular: 'Sora_400Regular',
+  medium: 'Sora_500Medium',
+  semiBold: 'Sora_600SemiBold',
+  bold: 'Sora_700Bold',
+  extraBold: 'Sora_800ExtraBold',
+} as const;
+
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#17184B',
+    background: '#F0EEE9',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#D3DDE7',
+    textSecondary: '#4A5073',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#F0EEE9',
+    background: '#17184B',
+    backgroundElement: '#273287',
+    backgroundSelected: '#3441A1',
+    textSecondary: '#D3DDE7',
   },
 } as const;
 
@@ -27,21 +37,21 @@ export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 export const Fonts = Platform.select({
   ios: {
-    sans: 'system-ui',
+    sans: APP_FONTS.regular,
     serif: 'ui-serif',
-    rounded: 'ui-rounded',
+    rounded: APP_FONTS.medium,
     mono: 'ui-monospace',
   },
   default: {
-    sans: 'normal',
+    sans: APP_FONTS.regular,
     serif: 'serif',
-    rounded: 'normal',
+    rounded: APP_FONTS.medium,
     mono: 'monospace',
   },
   web: {
-    sans: 'var(--font-display)',
+    sans: 'Sora_400Regular, Sora, ui-sans-serif, system-ui, sans-serif',
     serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
+    rounded: 'Sora_500Medium, Sora, sans-serif',
     mono: 'var(--font-mono)',
   },
 });
@@ -59,64 +69,80 @@ export const Spacing = {
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
-// === DSG DESIGN TOKENS (Design Guideline & System) ===
-
 export const APP_COLORS = {
-  // Brand - Deep Navy Academic Palette
-  deepNavy: '#0D47A1',
-  accentBlue: '#2196F3',
-  lightBlue: '#90CAF9',
-  softBlue: '#E3F2FD',
+  // Core Palette (assets/palette/image 12.png — MP067)
+  cloudDancer: '#F0EEE9',
+  tetsuKon: '#17184B',
+  intergalactic: '#273287',
+  durantaYellow: '#D8E63C',
+  nordicBreeze: '#D3DDE7',
+  lightViolet: '#D6B4FC',
 
-  // Primary & Variants
-  primary: '#0D47A1',
-  primaryHover: '#0A3882',
-  deepBlue: '#0A3882',
-  accent: '#2196F3',
-  primary500: '#2196F3',
-  primary100: '#90CAF9',
-  primary50: '#E3F2FD',
+  // Navbar Active Tosca & Dock
+  navbarDock: '#17184B',
+  navbarTosca: '#5EEAD4',
+  navbarInactive: '#D3DDE7',
 
-  // Status
-  opened: '#16A34A',
+  // Brand & Primary Aliases
+  deepNavy: '#17184B',
+  accentBlue: '#273287',
+  lightBlue: '#C3CFDC',
+  softBlue: '#E8EDF3',
+
+  primary: '#273287',
+  primaryHover: '#1E266D',
+  deepBlue: '#17184B',
+  accent: '#D8E63C',
+  primary500: '#273287',
+  primary100: '#D3DDE7',
+  primary50: '#E8EDF3',
+
+  // Status (WCAG AA contrast >= 4.5:1)
+  opened: '#166534',
   openedSoft: '#DCFCE7',
-  notOpened: '#D97706',
+  notOpened: '#92400E',
   notOpenedSoft: '#FEF3C7',
-  finished: '#64748B',
-  finishedSoft: '#F1F5F9',
+  finished: '#4A5073',
+  finishedSoft: '#E2E8F0',
   danger: '#DC2626',
+  dangerText: '#B91C1C',
   dangerSoft: '#FEE2E2',
   error: '#DC2626',
   errorSoft: '#FEE2E2',
-  info: '#0D47A1',
-  infoSoft: '#E3F2FD',
-  infoBorder: '#90CAF9',
+  info: '#273287',
+  infoSoft: '#E8EDF3',
+  infoBorder: '#C3CFDC',
 
-  // Neutrals
-  neutral950: '#0F172A',
-  neutral700: '#334155',
-  neutral500: '#64748B',
-  neutral400: '#94A3B8',
+  // Neutrals & Surfaces
+  neutral950: '#17184B',
+  neutral700: '#353A63',
+  neutral500: '#4A5073',
+  neutral400: '#646B8F',
   neutral300: '#CBD5E1',
-  neutral200: '#E2E8F0',
-  neutral100: '#F1F5F9',
-  neutral50: '#F8FAFC',
+  neutral200: '#DCE2EA',
+  neutral100: '#EAE6DF',
+  neutral50: '#F7F5F0',
   white: '#FFFFFF',
 
   // Semantic Aliases
-  navyHeading: '#0F172A',
-  background: '#F8FAFC',
+  navyHeading: '#17184B',
+  inkPrimary: '#17184B',
+  background: '#F0EEE9',
   surface: '#FFFFFF',
-  border: '#E2E8F0',
-  textPrimary: '#0F172A',
-  textSecondary: '#64748B',
-  textMuted: '#94A3B8',
-  success: '#16A34A',
+  surfaceSubtle: '#F7F5F0',
+  surfaceSecondary: '#D3DDE7',
+  surfaceAlternate: '#D6B4FC',
+  border: '#CBD5E1',
+  divider: '#E2DFD9',
+  textPrimary: '#17184B',
+  textSecondary: '#4A5073',
+  textMuted: '#5C6384',
+  success: '#166534',
   successBg: '#DCFCE7',
-  warning: '#D97706',
+  warning: '#92400E',
   warningBg: '#FEF3C7',
-  completed: '#64748B',
-  completedBg: '#F1F5F9',
+  completed: '#4A5073',
+  completedBg: '#E2E8F0',
 } as const;
 
 export const APP_SPACING = {
@@ -131,54 +157,81 @@ export const APP_SPACING = {
 
 export const APP_RADIUS = {
   sm: 8,
-  md: 10,
-  card: 12,
-  lg: 14,
-  xl: 16,
+  md: 12,
+  card: 16,
+  lg: 16,
+  hero: 20,
+  xl: 20,
   modal: 20,
   pill: 999,
 } as const;
 
 export const APP_TYPOGRAPHY = {
-  pageTitle: {
+  screenTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 22,
-    fontWeight: '700' as const,
-    color: APP_COLORS.white,
+    color: APP_COLORS.inkPrimary,
     lineHeight: 28,
+    letterSpacing: -0.3,
+  },
+  heroTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    color: APP_COLORS.durantaYellow,
+    lineHeight: 26,
+    letterSpacing: -0.2,
+  },
+  pageTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 26,
   },
   sectionTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '600' as const,
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     lineHeight: 22,
   },
   cardTitle: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 15,
-    fontWeight: '600' as const,
-    color: APP_COLORS.navyHeading,
-    lineHeight: 20,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 21,
   },
   body: {
-    fontSize: 13,
-    fontWeight: '400' as const,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
     color: APP_COLORS.textPrimary,
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+  bodyMedium: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 14,
+    color: APP_COLORS.textPrimary,
+    lineHeight: 20,
   },
   bodySecondary: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
-    fontWeight: '400' as const,
     color: APP_COLORS.textSecondary,
-    lineHeight: 18,
+    lineHeight: 19,
+  },
+  meta: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+    lineHeight: 17,
   },
   caption: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 11,
-    fontWeight: '500' as const,
     color: APP_COLORS.textMuted,
     lineHeight: 15,
   },
   buttonLabel: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '600' as const,
     lineHeight: 18,
   },
 } as const;
@@ -186,31 +239,31 @@ export const APP_TYPOGRAPHY = {
 export const APP_SHADOWS = {
   card: Platform.select({
     ios: {
-      shadowColor: '#0F172A',
+      shadowColor: '#17184B',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.04,
-      shadowRadius: 6,
+      shadowRadius: 4,
     },
     android: {
-      elevation: 1.5,
+      elevation: 1,
     },
     web: {
-      boxShadow: '0 1px 3px rgba(15, 23, 42, 0.05)',
+      boxShadow: '0 1px 3px rgba(23, 24, 75, 0.06)',
     },
     default: {},
   }),
   modal: Platform.select({
     ios: {
-      shadowColor: '#0F172A',
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.15,
-      shadowRadius: 24,
+      shadowColor: '#17184B',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
     },
     android: {
-      elevation: 10,
+      elevation: 6,
     },
     web: {
-      boxShadow: '0 8px 24px rgba(15, 23, 42, 0.15)',
+      boxShadow: '0 8px 24px rgba(23, 24, 75, 0.14)',
     },
     default: {},
   }),

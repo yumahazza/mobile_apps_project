@@ -1,12 +1,8 @@
 /**
- * Fritz — LeaveRequestScreen (Sprint 2)
- *
- * Layar Pengajuan Izin & Pemantauan Status Izin Real-time untuk Praktikan:
- * - Form pengajuan izin pada sesi praktikum tertentu dengan validasi alasan (Kebutuhan #9)
- * - Pencegahan pengajuan izin ganda pada sesi yang sama (Kebutuhan #10)
- * - Pemantauan status izin ('MENUNGGU', 'DITERIMA', 'DITOLAK') secara real-time via onSnapshot (Kebutuhan #10)
+ * LeaveRequestScreen
+ * Form pengajuan izin & pemantauan status izin praktikan yang sinkron dengan sesi terpilih.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -29,13 +25,13 @@ import {
 import { Card } from '@/components/Card';
 import { CustomButton } from '@/components/CustomButton';
 import { StatusBadge } from '@/components/StatusBadge';
-import { LeaveClassificationBadge } from '@/components/LeaveClassificationBadge';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -44,10 +40,12 @@ interface LeaveRequestScreenProps {
   navigation: NavigationProp;
 }
 
+type HistoryFilter = 'SELECTED' | 'ALL';
+
 export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
   navigation,
 }) => {
-  const { activeUser, activeScheduleId } = useApp();
+  const { activeUser, activeScheduleId, setActiveScheduleId } = useApp();
   const {
     schedules,
     loading: schedulesLoading,
@@ -58,22 +56,39 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
     loading: leavesLoading,
   } = useStudentLeaveRequests(activeUser.id);
 
-  const initialScheduleId =
-    navigation.params?.scheduleId || activeScheduleId || schedules[0]?.id || '';
-  const [selectedScheduleId, setSelectedScheduleId] = useState<string>(
-    initialScheduleId,
-  );
+  const requestedScheduleId = navigation.params?.scheduleId;
+  const [manualSelection, setManualSelection] = useState<{
+    paramKey?: string;
+    scheduleId: string;
+  } | null>(null);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('SELECTED');
   const [reason, setReason] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
 
+  const selectedScheduleId =
+    manualSelection && manualSelection.paramKey === requestedScheduleId
+      ? manualSelection.scheduleId
+      : requestedScheduleId || activeScheduleId || '';
+
   const currentSchedule =
-    schedules.find(s => s.id === selectedScheduleId) || schedules[0];
+    schedules.find((s) => s.id === selectedScheduleId) ||
+    (requestedScheduleId
+      ? schedules.find((s) => s.id === requestedScheduleId)
+      : schedules.find((s) => s.id === activeScheduleId)) ||
+    schedules[0];
 
   const existingLeaveForSelected = currentSchedule
-    ? leaveRequests.find(req => req.scheduleId === currentSchedule.id)
+    ? leaveRequests.find((req) => req.scheduleId === currentSchedule.id)
     : undefined;
 
   const isSessionFinished = currentSchedule?.status === 'SELESAI';
+
+  const displayedLeaves = useMemo(() => {
+    if (historyFilter === 'ALL' || !currentSchedule) {
+      return leaveRequests;
+    }
+    return leaveRequests.filter((item) => item.scheduleId === currentSchedule.id);
+  }, [historyFilter, leaveRequests, currentSchedule]);
 
   const handleSubmit = async () => {
     if (!currentSchedule) {
@@ -105,7 +120,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
         'Pengajuan Izin Gagal',
         err instanceof Error
           ? err.message
-          : 'Gagal menyimpan pengajuan izin ke Cloud Firestore.',
+          : 'Gagal menyimpan pengajuan izin.',
       );
     } finally {
       setSubmitting(false);
@@ -116,6 +131,11 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
         title="Pengajuan Izin"
+        subtitle={
+          currentSchedule
+            ? `${currentSchedule.courseName} · ${currentSchedule.className}`
+            : 'Formulir & riwayat izin'
+        }
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -123,13 +143,12 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Pemilihan Sesi Praktikum */}
         <Text style={styles.sectionTitle}>Pilih Sesi Praktikum</Text>
         {schedulesLoading ? (
           <Card style={styles.card}>
             <View style={styles.loadingRow}>
               <ActivityIndicator size="small" color={APP_COLORS.primary} />
-              <Text style={styles.loadingText}>Memuat jadwal praktikum...</Text>
+              <Text style={styles.loadingText}>Memuat jadwal...</Text>
             </View>
           </Card>
         ) : schedulesError ? (
@@ -139,7 +158,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
         ) : schedules.length === 0 ? (
           <Card style={styles.card}>
             <Text style={styles.loadingText}>
-              Belum ada jadwal praktikum yang terdaftar untuk akun Anda.
+              Belum ada jadwal praktikum terdaftar.
             </Text>
           </Card>
         ) : (
@@ -147,12 +166,18 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.scheduleTabsRow}>
-            {schedules.map(item => {
+            {schedules.map((item) => {
               const isSelected = item.id === currentSchedule?.id;
               return (
                 <Pressable
                   key={item.id}
-                  onPress={() => setSelectedScheduleId(item.id)}
+                  onPress={() => {
+                    setManualSelection({
+                      paramKey: requestedScheduleId,
+                      scheduleId: item.id,
+                    });
+                    setActiveScheduleId(item.id);
+                  }}
                   style={[
                     styles.scheduleChip,
                     isSelected && styles.scheduleChipActive,
@@ -161,7 +186,8 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                     style={[
                       styles.scheduleChipTitle,
                       isSelected && styles.scheduleChipTitleActive,
-                    ]}>
+                    ]}
+                    numberOfLines={1}>
                     {item.courseName}
                   </Text>
                   <Text
@@ -169,7 +195,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                       styles.scheduleChipSub,
                       isSelected && styles.scheduleChipSubActive,
                     ]}>
-                    {item.className} • {item.date}
+                    {item.className} · {item.date}
                   </Text>
                 </Pressable>
               );
@@ -177,14 +203,16 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
           </ScrollView>
         )}
 
-        {/* Form Pengajuan Izin Sesi Terpilih */}
+        {/* Form atau Status Sesi Terpilih */}
         {currentSchedule && (
           <Card style={styles.formCard}>
             <View style={styles.formHeaderRow}>
               <View style={styles.formTitleCol}>
-                <Text style={styles.courseTitle}>{currentSchedule.courseName}</Text>
+                <Text style={styles.courseTitle}>
+                  {currentSchedule.courseName}
+                </Text>
                 <Text style={styles.courseMeta}>
-                  {currentSchedule.className} • {currentSchedule.time} | {currentSchedule.room}
+                  {currentSchedule.className} · {currentSchedule.time} · {currentSchedule.room}
                 </Text>
               </View>
               <StatusBadge status={currentSchedule.status} size="sm" />
@@ -192,25 +220,23 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
 
             {existingLeaveForSelected ? (
               <View style={styles.alreadySubmittedBox}>
-                <View style={styles.alreadySubmittedHeader}>
-                  <Ionicons
-                    name="information-circle"
-                    size={18}
-                    color={APP_COLORS.primary}
-                  />
+                <View style={styles.alreadySubmittedRow}>
                   <Text style={styles.alreadySubmittedTitle}>
-                    Izin Sudah Diajukan untuk Sesi Ini
+                    Status Izin Sesi Ini
                   </Text>
+                  <StatusBadge
+                    status={existingLeaveForSelected.status}
+                    size="sm"
+                  />
                 </View>
                 <Text style={styles.alreadySubmittedDesc}>
-                  Anda tidak dapat mengajukan izin lebih dari 1 kali pada sesi yang sama. Status saat ini:{' '}
-                  <Text style={styles.boldText}>{existingLeaveForSelected.status}</Text>.
+                  Pengajuan sudah tercatat untuk {currentSchedule.courseName}.
                 </Text>
               </View>
             ) : isSessionFinished ? (
               <View style={styles.alreadySubmittedBox}>
                 <Text style={styles.alreadySubmittedDesc}>
-                  Sesi praktikum ini telah selesai (`SELESAI`). Pengajuan izin tidak dapat dilakukan lagi.
+                  Sesi selesai. Pengajuan izin sudah ditutup.
                 </Text>
               </View>
             ) : (
@@ -218,7 +244,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                 <Text style={styles.inputLabel}>Alasan Ketidakhadiran *</Text>
                 <TextInput
                   style={styles.textArea}
-                  placeholder="Tuliskan alasan izin secara lengkap (mis. Sakit demam, urusan keluarga mendesak, delegasi lomba kampus)..."
+                  placeholder="Contoh: Sakit demam, ada surat dokter..."
                   placeholderTextColor={APP_COLORS.neutral400}
                   multiline
                   numberOfLines={4}
@@ -228,17 +254,16 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                   editable={!submitting}
                   textAlignVertical="top"
                 />
-                <Text style={styles.charCounter}>{reason.trim().length}/500 karakter</Text>
+                <Text style={styles.charCounter}>
+                  {reason.trim().length}/500
+                </Text>
 
-                <View style={styles.aiInfoBox}>
-                  <Ionicons name="bulb-outline" size={16} color={APP_COLORS.primary} />
-                  <Text style={styles.aiInfoText}>
-                    Sistem AI akan mengklasifikasikan kategori alasan izin secara otomatis untuk membantu pemeriksaan asisten. Keputusan diterima/ditolak tetap 100% ditentukan oleh Asisten Praktikum.
-                  </Text>
-                </View>
+                <Text style={styles.manualNoteText}>
+                  Status awal MENUNGGU dan diperiksa manual oleh asisten.
+                </Text>
 
                 <CustomButton
-                  title={submitting ? 'Mengirim Pengajuan...' : 'Kirim Pengajuan Izin'}
+                  title={submitting ? 'Mengirim...' : 'Kirim Pengajuan Izin'}
                   variant="primary"
                   size="lg"
                   loading={submitting}
@@ -247,7 +272,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                     !submitting ? (
                       <Ionicons
                         name="paper-plane-outline"
-                        size={18}
+                        size={17}
                         color={APP_COLORS.white}
                       />
                     ) : undefined
@@ -259,37 +284,77 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
           </Card>
         )}
 
-        {/* Daftar Pemantauan Status Izin Real-time */}
+        {/* Daftar Status & Riwayat Pengajuan Izin */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>Status Pengajuan Izin Saya (Real-time)</Text>
-          {leavesLoading && (
-            <ActivityIndicator size="small" color={APP_COLORS.primary} />
-          )}
+          <View style={styles.listTitleRow}>
+            <Text style={styles.sectionTitle}>Riwayat Izin</Text>
+            {leavesLoading && (
+              <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            )}
+          </View>
+
+          <View style={styles.toggleGroup}>
+            <Pressable
+              onPress={() => setHistoryFilter('SELECTED')}
+              style={[
+                styles.toggleChip,
+                historyFilter === 'SELECTED' && styles.toggleChipActive,
+              ]}>
+              <Text
+                style={[
+                  styles.toggleChipText,
+                  historyFilter === 'SELECTED' && styles.toggleChipTextActive,
+                ]}>
+                Sesi Ini
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setHistoryFilter('ALL')}
+              style={[
+                styles.toggleChip,
+                historyFilter === 'ALL' && styles.toggleChipActive,
+              ]}>
+              <Text
+                style={[
+                  styles.toggleChipText,
+                  historyFilter === 'ALL' && styles.toggleChipTextActive,
+                ]}>
+                Semua ({leaveRequests.length})
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        {leaveRequests.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <EmptyState
-              icon="document-text-outline"
-              title="Belum Ada Pengajuan Izin"
-              description="Riwayat dan status pengajuan izin ketidakhadiran Anda (MENUNGGU, DITERIMA, atau DITOLAK) akan tampil secara real-time di sini."
-            />
-          </Card>
+        {displayedLeaves.length === 0 ? (
+          <EmptyState
+            icon="document-text-outline"
+            title="Belum Ada Pengajuan Izin"
+            description={
+              historyFilter === 'SELECTED' && currentSchedule
+                ? `Belum ada pengajuan izin untuk ${currentSchedule.courseName}.`
+                : 'Riwayat pengajuan izin Anda akan tampil di sini.'
+            }
+          />
         ) : (
           <View style={styles.leaveList}>
-            {leaveRequests.map(item => {
-              const matchedSchedule = schedules.find(s => s.id === item.scheduleId);
+            {displayedLeaves.map((item) => {
+              const matchedSchedule = schedules.find(
+                (s) => s.id === item.scheduleId,
+              );
               const courseTitle =
-                item.courseName || matchedSchedule?.courseName || 'Sesi Praktikum';
+                matchedSchedule?.courseName ||
+                item.courseName ||
+                'Sesi Praktikum';
               const classSubtitle =
-                item.className || matchedSchedule?.className || '';
+                matchedSchedule?.className || item.className || '';
 
               return (
                 <Card key={item.id} style={styles.leaveItemCard}>
                   <View style={styles.leaveItemHeader}>
                     <View style={styles.leaveItemTitleCol}>
-                      <Text style={styles.leaveCourseName}>
-                        {courseTitle} {classSubtitle ? `• ${classSubtitle}` : ''}
+                      <Text style={styles.leaveCourseName} numberOfLines={1}>
+                        {courseTitle}
+                        {classSubtitle ? ` · ${classSubtitle}` : ''}
                       </Text>
                       <Text style={styles.leaveDateText}>{item.createdAt}</Text>
                     </View>
@@ -297,25 +362,16 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
                   </View>
 
                   <View style={styles.leaveReasonBox}>
-                    <Text style={styles.leaveReasonLabel}>Alasan Izin:</Text>
-                    <Text style={styles.leaveReasonText}>&quot;{item.reason}&quot;</Text>
+                    <Text style={styles.leaveReasonText}>“{item.reason}”</Text>
                   </View>
 
-                  <View style={styles.leaveBadgesRow}>
-                    <LeaveClassificationBadge
-                      classification={item.aiClassification}
-                      aiStatus={item.aiStatus}
-                      urgency={item.aiUrgency}
-                      size="sm"
-                    />
-                  </View>
-
-                  {item.reviewedBy ? (
-                    <Text style={styles.reviewerText}>
-                      Diperiksa oleh: {item.reviewedBy}{' '}
-                      {item.reviewedAt ? `(${item.reviewedAt})` : ''}
-                    </Text>
-                  ) : null}
+                  <Text style={styles.reviewerText}>
+                    {item.reviewedBy
+                      ? `Asisten: ${item.reviewedBy}${
+                          item.reviewedAt ? ` · ${item.reviewedAt}` : ''
+                        }`
+                      : 'Menunggu review asisten'}
+                  </Text>
                 </Card>
               );
             })}
@@ -326,7 +382,7 @@ export const LeaveRequestScreen: React.FC<LeaveRequestScreenProps> = ({
       <BottomNavigation
         role="student"
         activeTab="StudentHome"
-        onTabChange={tabKey => navigation.navigate(tabKey)}
+        onTabChange={(tabKey) => navigation.navigate(tabKey)}
       />
     </SafeAreaView>
   );
@@ -339,17 +395,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   sectionTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: APP_SPACING.sm,
   },
   card: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -362,49 +418,51 @@ const styles = StyleSheet.create({
     gap: APP_SPACING.sm,
   },
   loadingText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
   scheduleTabsRow: {
-    gap: APP_SPACING.sm,
+    gap: 8,
     paddingBottom: APP_SPACING.md,
   },
   scheduleChip: {
     paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    minWidth: 160,
+    minWidth: 150,
   },
   scheduleChipActive: {
     backgroundColor: APP_COLORS.primary,
     borderColor: APP_COLORS.primary,
   },
   scheduleChipTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   scheduleChipTitleActive: {
     color: APP_COLORS.white,
   },
   scheduleChipSub: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
     color: APP_COLORS.textSecondary,
     marginTop: 2,
   },
   scheduleChipSubActive: {
-    color: '#DBEAFE',
+    color: APP_COLORS.nordicBreeze,
   },
   formCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.lg,
+    marginBottom: APP_SPACING.xl,
   },
   formHeaderRow: {
     flexDirection: 'row',
@@ -416,83 +474,74 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   courseTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   courseMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
     marginTop: 2,
   },
   alreadySubmittedBox: {
     marginTop: APP_SPACING.md,
-    padding: APP_SPACING.sm,
+    padding: APP_SPACING.md,
     backgroundColor: APP_COLORS.softBlue,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: APP_COLORS.lightBlue,
+    borderRadius: APP_RADIUS.md,
   },
-  alreadySubmittedHeader: {
+  alreadySubmittedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'space-between',
+    gap: 8,
     marginBottom: 4,
   },
   alreadySubmittedTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '700',
     color: APP_COLORS.primary,
   },
   alreadySubmittedDesc: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
     lineHeight: 18,
-  },
-  boldText: {
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
   },
   formBody: {
     marginTop: APP_SPACING.md,
   },
   inputLabel: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 6,
   },
   textArea: {
+    fontFamily: APP_FONTS.regular,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    borderRadius: 10,
-    padding: APP_SPACING.sm,
-    minHeight: 96,
-    fontSize: 13,
-    color: APP_COLORS.navyHeading,
-    backgroundColor: '#F8FAFC',
+    borderRadius: APP_RADIUS.md,
+    padding: APP_SPACING.md,
+    minHeight: 92,
+    fontSize: 14,
+    lineHeight: 20,
+    color: APP_COLORS.inkPrimary,
+    backgroundColor: APP_COLORS.surfaceSubtle,
   },
   charCounter: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
     color: APP_COLORS.textMuted,
     textAlign: 'right',
     marginTop: 4,
   },
-  aiInfoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    backgroundColor: APP_COLORS.softBlue,
-    padding: APP_SPACING.sm,
-    borderRadius: 8,
-    marginTop: APP_SPACING.sm,
-    marginBottom: APP_SPACING.md,
-  },
-  aiInfoText: {
-    flex: 1,
-    fontSize: 11,
+  manualNoteText: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 12,
     color: APP_COLORS.textSecondary,
-    lineHeight: 16,
+    marginTop: 4,
+    marginBottom: APP_SPACING.md,
   },
   listHeaderRow: {
     flexDirection: 'row',
@@ -500,18 +549,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: APP_SPACING.sm,
   },
-  emptyCard: {
-    padding: APP_SPACING.sm,
-    borderRadius: APP_RADIUS.card,
+  listTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleGroup: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: APP_SPACING.sm,
+  },
+  toggleChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: APP_RADIUS.pill,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
+  },
+  toggleChipActive: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  toggleChipText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 11,
+    color: APP_COLORS.textSecondary,
+  },
+  toggleChipTextActive: {
+    color: APP_COLORS.white,
   },
   leaveList: {
     gap: APP_SPACING.sm,
   },
   leaveItemCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -527,44 +599,34 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   leaveCourseName: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   leaveDateText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
     color: APP_COLORS.textMuted,
     marginTop: 2,
   },
   leaveReasonBox: {
     marginTop: APP_SPACING.sm,
-    padding: APP_SPACING.sm,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-  },
-  leaveReasonLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: APP_COLORS.textSecondary,
-    marginBottom: 2,
+    padding: APP_SPACING.md,
+    backgroundColor: APP_COLORS.surfaceSubtle,
+    borderRadius: APP_RADIUS.md,
+    borderLeftWidth: 3,
+    borderLeftColor: APP_COLORS.primary,
   },
   leaveReasonText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 13,
-    color: APP_COLORS.navyHeading,
-    fontStyle: 'italic',
-    lineHeight: 18,
-  },
-  leaveBadgesRow: {
-    marginTop: APP_SPACING.sm,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 19,
   },
   reviewerText: {
-    marginTop: APP_SPACING.xs,
-    fontSize: 11,
+    marginTop: APP_SPACING.sm,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
     color: APP_COLORS.textSecondary,
   },
 });

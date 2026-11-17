@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   View,
@@ -14,7 +13,7 @@ import { useApp } from '@/context/AppContext';
 import { AssistantStack } from '@/navigation/AssistantStack';
 import { StudentStack } from '@/navigation/StudentStack';
 import { AuthScreen } from '@/screens/shared/AuthScreen';
-import { APP_COLORS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS } from '@/constants/theme';
 
 export const AppNavigator: React.FC = () => {
   const {
@@ -49,44 +48,32 @@ export const AppNavigator: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={styles.safeArea}
-      edges={['left', 'right']}
-    >
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
       <View style={styles.container}>
         <View style={styles.content}>
           {authLoading ? (
             <View style={styles.center}>
-              <ActivityIndicator
-                size="large"
-                color={APP_COLORS.primary}
-              />
-              <Text style={styles.loadingText}>
-                Memeriksa akun...
-              </Text>
+              <ActivityIndicator size="large" color={APP_COLORS.primary} />
+              <Text style={styles.loadingText}>Memeriksa akun...</Text>
             </View>
           ) : authError && !isAuthenticated ? (
             <View style={styles.center}>
               <Text style={styles.errorTitle}>
                 {firebaseUnavailable
                   ? 'Development Build Diperlukan'
-                  : 'Profil gagal dimuat'}
+                  : 'Profil Gagal Dimuat'}
               </Text>
 
-              <Text style={styles.errorMessage}>
-                {authError}
-              </Text>
+              <Text style={styles.errorMessage}>{authError}</Text>
 
               <Text style={styles.errorHint}>
                 {firebaseUnavailable
-                  ? 'Bangun aplikasi dengan EAS/Expo Development Build (Android), lalu jalankan npx expo start --dev-client.'
-                  : 'Periksa koneksi internet dan aturan akses Firestore.'}
+                  ? 'Jalankan aplikasi dengan Development Build Android/iOS lalu npx expo start --dev-client.'
+                  : 'Periksa koneksi internet dan akses database.'}
               </Text>
 
               {!firebaseUnavailable && logoutError ? (
-                <Text style={styles.errorMessage}>
-                  {logoutError}
-                </Text>
+                <Text style={styles.errorMessage}>{logoutError}</Text>
               ) : null}
 
               {!firebaseUnavailable ? (
@@ -97,13 +84,12 @@ export const AppNavigator: React.FC = () => {
                     styles.errorButton,
                     pressed && styles.pressed,
                     loggingOut && styles.disabledButton,
-                  ]}
-                >
+                  ]}>
                   {loggingOut ? (
-                    <ActivityIndicator color="#FFFFFF" />
+                    <ActivityIndicator color={APP_COLORS.white} />
                   ) : (
                     <Text style={styles.errorButtonText}>
-                      Keluar dan kembali ke login
+                      Kembali ke Login
                     </Text>
                   )}
                 </Pressable>
@@ -125,7 +111,7 @@ export const AppNavigator: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: APP_COLORS.primary,
+    backgroundColor: APP_COLORS.background,
     alignItems: 'center',
   },
   container: {
@@ -144,45 +130,53 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   loadingText: {
+    fontFamily: APP_FONTS.medium,
     marginTop: 12,
     fontSize: 14,
-    color: '#687386',
+    color: APP_COLORS.textSecondary,
   },
   errorTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: '#C62828',
+    color: APP_COLORS.dangerText,
     textAlign: 'center',
   },
   errorMessage: {
+    fontFamily: APP_FONTS.regular,
     marginTop: 8,
     fontSize: 14,
-    color: '#344054',
+    color: APP_COLORS.inkPrimary,
     textAlign: 'center',
+    lineHeight: 20,
   },
   errorHint: {
+    fontFamily: APP_FONTS.regular,
     marginTop: 8,
-    fontSize: 13,
-    color: '#687386',
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
     textAlign: 'center',
+    lineHeight: 18,
   },
   errorButton: {
     marginTop: 20,
-    paddingHorizontal: 18,
+    minHeight: 46,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: APP_RADIUS.md,
     backgroundColor: APP_COLORS.primary,
+    justifyContent: 'center',
   },
   errorButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.white,
+    fontSize: 14,
     textAlign: 'center',
   },
   disabledButton: {
     opacity: 0.65,
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.78,
   },
 });
 

@@ -1,7 +1,6 @@
 /**
  * Card Component
- * SRS-UI-002: Base reusable Card container
- * Follows DSG.md Section 8 & 13 (Rounded cards, subtle shadow, clean hierarchy)
+ * Clean white or tinted container aligned with DESIGN_ANTI_AI_SLOP_GUIDELINES.md
  */
 
 import React from 'react';
@@ -37,7 +36,7 @@ export const Card: React.FC<CardProps> = ({
 }) => {
   const cardStyle: ViewStyle = {
     padding,
-    borderColor: highlighted ? APP_COLORS.primary500 : APP_COLORS.neutral200,
+    borderColor: highlighted ? APP_COLORS.primary : APP_COLORS.border,
     backgroundColor: APP_COLORS.white,
   };
 
@@ -76,13 +75,12 @@ export const Card: React.FC<CardProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: APP_RADIUS.lg,
+    borderRadius: APP_RADIUS.card,
     borderWidth: 1,
     overflow: 'hidden',
   },
   pressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.995 }],
+    opacity: 0.9,
   },
   header: {
     marginBottom: APP_SPACING.md,
@@ -93,10 +91,9 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: APP_SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: APP_COLORS.neutral200,
+    borderTopColor: APP_COLORS.divider,
     paddingTop: APP_SPACING.md,
   },
 });
 
 export default Card;
-

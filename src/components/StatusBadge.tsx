@@ -1,14 +1,13 @@
 /**
  * StatusBadge Component
- * SRS-UI-002: Base reusable UI component for session and attendance status
- * Follows DSG.md Section 12 (Status Badge)
+ * Reusable badge for session, attendance, and leave request statuses.
  */
 
 import React from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { SessionStatus } from '@/data/schedules';
-import { APP_COLORS, APP_RADIUS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS } from '@/constants/theme';
 
 export type BadgeStatus = SessionStatus | 'HADIR' | 'TIDAK_HADIR' | 'INFO';
 
@@ -55,7 +54,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     case 'HADIR':
       backgroundColor = APP_COLORS.openedSoft;
       textColor = APP_COLORS.opened;
-      iconName = 'radio-button-on';
+      iconName = 'checkmark-circle';
       displayLabel = displayLabel || 'Hadir';
       break;
     case 'IZIN':
@@ -68,19 +67,19 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     case 'TIDAK_HADIR':
     case 'TIDAK HADIR':
       backgroundColor = APP_COLORS.errorSoft;
-      textColor = APP_COLORS.error;
+      textColor = APP_COLORS.dangerText;
       iconName = 'close-circle-outline';
       displayLabel = displayLabel || 'Alfa';
       break;
     case 'INFO':
-      backgroundColor = APP_COLORS.primary100;
+      backgroundColor = APP_COLORS.primary50;
       textColor = APP_COLORS.primary;
       iconName = 'information-circle-outline';
       displayLabel = displayLabel || 'INFO';
       break;
     case 'ERROR':
       backgroundColor = APP_COLORS.errorSoft;
-      textColor = APP_COLORS.error;
+      textColor = APP_COLORS.dangerText;
       iconName = 'alert-circle-outline';
       displayLabel = displayLabel || 'ERROR';
       break;
@@ -98,7 +97,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       break;
     case 'DITOLAK':
       backgroundColor = APP_COLORS.errorSoft;
-      textColor = APP_COLORS.error;
+      textColor = APP_COLORS.dangerText;
       iconName = 'close-circle-outline';
       displayLabel = displayLabel || 'DITOLAK';
       break;
@@ -109,20 +108,20 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
 
   const sizeStyles = {
     sm: {
-      paddingVertical: 2,
-      paddingHorizontal: 8,
+      paddingVertical: 4,
+      paddingHorizontal: 9,
       iconSize: 12,
       fontSize: 11,
     },
     md: {
-      paddingVertical: 4,
-      paddingHorizontal: 12,
+      paddingVertical: 5,
+      paddingHorizontal: 11,
       iconSize: 14,
       fontSize: 12,
     },
     lg: {
       paddingVertical: 6,
-      paddingHorizontal: 14,
+      paddingHorizontal: 13,
       iconSize: 15,
       fontSize: 13,
     },
@@ -162,11 +161,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     borderRadius: APP_RADIUS.pill,
-    gap: 6,
+    gap: 5,
   },
   label: {
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontFamily: APP_FONTS.bold,
+    letterSpacing: 0.3,
     textTransform: 'uppercase',
   },
 });

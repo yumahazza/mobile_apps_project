@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,12 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import {
   registerWithEmail,
   signInWithEmail,
 } from '@/services/authService';
 import { useApp } from '@/context/AppContext';
-import { APP_COLORS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
 
 type AuthMode = 'login' | 'register';
 
@@ -30,6 +30,8 @@ export const AuthScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -81,9 +83,6 @@ export const AuthScreen: React.FC = () => {
       } else {
         await signInWithEmail(normalizedEmail, password);
       }
-
-      // AppContext akan mendeteksi perubahan Firebase Auth
-      // dan memuat profil pengguna dari Firestore.
     } catch (error) {
       const code =
         typeof error === 'object' &&
@@ -108,21 +107,13 @@ export const AuthScreen: React.FC = () => {
       ) {
         setErrorMessage('Email atau password salah.');
       } else if (code.includes('network-request-failed')) {
-        setErrorMessage(
-          'Koneksi internet bermasalah. Silakan coba lagi.',
-        );
+        setErrorMessage('Koneksi internet bermasalah.');
       } else if (code.includes('too-many-requests')) {
-        setErrorMessage(
-          'Terlalu banyak percobaan login. Coba lagi nanti.',
-        );
+        setErrorMessage('Terlalu banyak percobaan login.');
       } else if (code.includes('operation-not-allowed')) {
-        setErrorMessage(
-          'Metode login email dan password belum diaktifkan.',
-        );
+        setErrorMessage('Login email/password belum aktif.');
       } else {
-        setErrorMessage(
-          message || 'Terjadi kesalahan. Silakan coba lagi.',
-        );
+        setErrorMessage(message || 'Terjadi kesalahan. Silakan coba lagi.');
       }
     } finally {
       setLoading(false);
@@ -140,62 +131,50 @@ export const AuthScreen: React.FC = () => {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+        keyboardShouldPersistTaps="handled">
         <View style={styles.card}>
-          <View style={styles.brand}>
-            <Text style={styles.brandTitle}>Mobile Apps</Text>
-            <Text style={styles.brandSubtitle}>
-              Praktikum jadi lebih mudah
-            </Text>
-          </View>
-
           <Text style={styles.title}>
-            {isRegister ? 'Buat Akun' : 'Selamat Datang'}
+            {isRegister ? 'Daftar Akun' : 'Presensi Praktikum'}
           </Text>
-
           <Text style={styles.description}>
             {isRegister
-              ? 'Daftarkan akun praktikanmu untuk memulai.'
-              : 'Masuk menggunakan akun yang sudah terdaftar.'}
+              ? 'Lengkapi data akun praktikan.'
+              : 'Masuk dengan akun terdaftar.'}
           </Text>
 
           {isRegister && (
             <>
-              <Text style={styles.label}>Nama lengkap</Text>
+              <Text style={styles.label}>Nama Lengkap</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="Masukkan nama lengkap"
-                placeholderTextColor="#9299A5"
+                placeholder="Nama lengkap"
+                placeholderTextColor={APP_COLORS.neutral400}
                 autoCapitalize="words"
                 editable={!loading}
               />
 
-              <Text style={styles.label}>NIM (opsional)</Text>
+              <Text style={styles.label}>NIM (Opsional)</Text>
               <TextInput
                 style={styles.input}
                 value={nim}
                 onChangeText={setNim}
-                placeholder="Masukkan NIM"
-                placeholderTextColor="#9299A5"
+                placeholder="Nomor Induk Mahasiswa"
+                placeholderTextColor={APP_COLORS.neutral400}
                 editable={!loading}
               />
 
-              <Text style={styles.label}>
-                Program studi (opsional)
-              </Text>
+              <Text style={styles.label}>Program Studi (Opsional)</Text>
               <TextInput
                 style={styles.input}
                 value={department}
                 onChangeText={setDepartment}
                 placeholder="Contoh: Informatika"
-                placeholderTextColor="#9299A5"
+                placeholderTextColor={APP_COLORS.neutral400}
                 editable={!loading}
               />
             </>
@@ -207,7 +186,7 @@ export const AuthScreen: React.FC = () => {
             value={email}
             onChangeText={setEmail}
             placeholder="nama@email.com"
-            placeholderTextColor="#9299A5"
+            placeholderTextColor={APP_COLORS.neutral400}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -215,51 +194,81 @@ export const AuthScreen: React.FC = () => {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Minimal 6 karakter"
-            placeholderTextColor="#9299A5"
-            secureTextEntry
-            autoCapitalize="none"
-            editable={!loading}
-          />
+          <View style={styles.passwordWrapper}>
+            <TextInput
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Minimal 6 karakter"
+              placeholderTextColor={APP_COLORS.neutral400}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              editable={!loading}
+            />
+            <Pressable
+              onPress={() => setShowPassword((prev) => !prev)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                showPassword ? 'Sembunyikan password' : 'Tampilkan password'
+              }
+              style={styles.eyeButton}>
+              <Ionicons
+                name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={APP_COLORS.textSecondary}
+              />
+            </Pressable>
+          </View>
 
           {isRegister && (
             <>
-              <Text style={styles.label}>
-                Konfirmasi password
-              </Text>
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                placeholder="Ulangi password"
-                placeholderTextColor="#9299A5"
-                secureTextEntry
-                autoCapitalize="none"
-                editable={!loading}
-              />
+              <Text style={styles.label}>Konfirmasi Password</Text>
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  placeholder="Ulangi password"
+                  placeholderTextColor={APP_COLORS.neutral400}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                />
+                <Pressable
+                  onPress={() => setShowConfirmPassword((prev) => !prev)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    showConfirmPassword
+                      ? 'Sembunyikan konfirmasi password'
+                      : 'Tampilkan konfirmasi password'
+                  }
+                  style={styles.eyeButton}>
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={APP_COLORS.textSecondary}
+                  />
+                </Pressable>
+              </View>
             </>
           )}
 
           {(errorMessage || authError) && (
-            <Text style={styles.error}>
-              {errorMessage || authError}
-            </Text>
+            <Text style={styles.error}>{errorMessage || authError}</Text>
           )}
 
           <Pressable
-            style={[
+            style={({ pressed }) => [
               styles.primaryButton,
               loading && styles.disabledButton,
+              pressed && !loading && styles.pressed,
             ]}
             onPress={handleSubmit}
-            disabled={loading}
-          >
+            disabled={loading}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={APP_COLORS.white} />
             ) : (
               <Text style={styles.primaryButtonText}>
                 {isRegister ? 'Daftar' : 'Masuk'}
@@ -269,15 +278,10 @@ export const AuthScreen: React.FC = () => {
 
           <View style={styles.switchRow}>
             <Text style={styles.switchText}>
-              {isRegister
-                ? 'Sudah punya akun? '
-                : 'Belum punya akun? '}
+              {isRegister ? 'Sudah punya akun? ' : 'Belum punya akun? '}
             </Text>
 
-            <Pressable
-              onPress={changeMode}
-              disabled={loading}
-            >
+            <Pressable onPress={changeMode} disabled={loading} hitSlop={8}>
               <Text style={styles.switchAction}>
                 {isRegister ? 'Masuk' : 'Daftar'}
               </Text>
@@ -297,65 +301,83 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
-    padding: 24,
+    padding: APP_SPACING.xl,
   },
   card: {
     width: '100%',
     maxWidth: 420,
     alignSelf: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 24,
-    gap: 10,
-  },
-  brand: {
-    marginBottom: 18,
-  },
-  brandTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: APP_COLORS.primary,
-  },
-  brandSubtitle: {
-    fontSize: 13,
-    color: '#687386',
-    marginTop: 4,
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.modal,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    padding: APP_SPACING.xxl,
+    gap: 8,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#202938',
+    fontFamily: APP_FONTS.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    color: APP_COLORS.inkPrimary,
   },
   description: {
-    fontSize: 14,
-    color: '#687386',
-    lineHeight: 21,
-    marginBottom: 12,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 13,
+    color: APP_COLORS.textSecondary,
+    lineHeight: 19,
+    marginBottom: APP_SPACING.sm,
   },
   label: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 13,
-    fontWeight: '600',
-    color: '#344054',
+    color: APP_COLORS.inkPrimary,
     marginTop: 4,
   },
   input: {
+    fontFamily: APP_FONTS.regular,
     minHeight: 48,
     borderWidth: 1,
-    borderColor: '#D8DEE8',
-    borderRadius: 10,
+    borderColor: APP_COLORS.border,
+    borderRadius: APP_RADIUS.md,
     paddingHorizontal: 14,
-    color: '#202938',
-    backgroundColor: '#FFFFFF',
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
+    backgroundColor: APP_COLORS.white,
+  },
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.white,
+    paddingLeft: 14,
+    paddingRight: 6,
+  },
+  passwordInput: {
+    flex: 1,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
+    minHeight: 46,
+  },
+  eyeButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   error: {
-    color: '#C62828',
+    fontFamily: APP_FONTS.medium,
+    color: APP_COLORS.dangerText,
     fontSize: 13,
     lineHeight: 19,
-    marginTop: 6,
+    marginTop: 4,
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 10,
+    borderRadius: APP_RADIUS.md,
     backgroundColor: APP_COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -364,24 +386,29 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.65,
   },
+  pressed: {
+    opacity: 0.82,
+  },
   primaryButtonText: {
-    color: '#FFFFFF',
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.white,
     fontSize: 15,
-    fontWeight: '700',
   },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
     flexWrap: 'wrap',
-    marginTop: 12,
+    marginTop: 10,
   },
   switchText: {
-    color: '#687386',
+    fontFamily: APP_FONTS.regular,
+    color: APP_COLORS.textSecondary,
     fontSize: 13,
   },
   switchAction: {
+    fontFamily: APP_FONTS.bold,
     color: APP_COLORS.primary,
-    fontWeight: '700',
     fontSize: 13,
   },
 });

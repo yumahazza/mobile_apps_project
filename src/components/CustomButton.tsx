@@ -1,7 +1,6 @@
 /**
  * CustomButton Component
- * SRS-UI-002: Base reusable UI button with primary, secondary, destructive, and outline variants
- * Follows DSG.md Section 23 (Button System)
+ * Reusable UI button with primary, accent (Duranta Yellow), secondary, danger, outline, and ghost variants.
  */
 
 import React from 'react';
@@ -14,9 +13,9 @@ import {
   TextStyle,
   View,
 } from 'react-native';
-import { APP_COLORS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS, APP_SPACING } from '@/constants/theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost';
+export type ButtonVariant = 'primary' | 'accent' | 'secondary' | 'danger' | 'outline' | 'ghost';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
 export interface CustomButtonProps {
@@ -52,16 +51,27 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     if (disabled) {
       return {
         container: {
-          backgroundColor: APP_COLORS.neutral200,
-          borderColor: 'transparent',
+          backgroundColor: APP_COLORS.neutral100,
+          borderColor: APP_COLORS.border,
+          borderWidth: 1,
         },
         text: {
-          color: APP_COLORS.neutral500,
+          color: APP_COLORS.textMuted,
         },
       };
     }
 
     switch (variant) {
+      case 'accent':
+        return {
+          container: {
+            backgroundColor: APP_COLORS.durantaYellow,
+            borderColor: 'transparent',
+          },
+          text: {
+            color: APP_COLORS.tetsuKon,
+          },
+        };
       case 'primary':
         return {
           container: {
@@ -75,12 +85,11 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
       case 'secondary':
         return {
           container: {
-            backgroundColor: APP_COLORS.primary50,
-            borderColor: APP_COLORS.primary100,
-            borderWidth: 1,
+            backgroundColor: APP_COLORS.nordicBreeze,
+            borderColor: 'transparent',
           },
           text: {
-            color: APP_COLORS.primary,
+            color: APP_COLORS.tetsuKon,
           },
         };
       case 'danger':
@@ -97,11 +106,11 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         return {
           container: {
             backgroundColor: APP_COLORS.white,
-            borderColor: APP_COLORS.neutral300,
-            borderWidth: 1.5,
+            borderColor: APP_COLORS.border,
+            borderWidth: 1,
           },
           text: {
-            color: APP_COLORS.neutral700,
+            color: APP_COLORS.tetsuKon,
           },
         };
       case 'ghost':
@@ -132,38 +141,44 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
       case 'sm':
         return {
           container: {
-            height: 38,
+            minHeight: 38,
+            paddingVertical: 8,
             paddingHorizontal: APP_SPACING.md,
             borderRadius: APP_RADIUS.md,
           },
           text: {
+            fontFamily: APP_FONTS.semiBold,
             fontSize: 13,
-            fontWeight: '600',
+            lineHeight: 18,
           },
         };
       case 'lg':
         return {
           container: {
-            height: 52,
-            paddingHorizontal: APP_SPACING.xxl,
-            borderRadius: APP_RADIUS.md,
+            minHeight: 50,
+            paddingVertical: 12,
+            paddingHorizontal: APP_SPACING.xl,
+            borderRadius: APP_RADIUS.lg,
           },
           text: {
-            fontSize: 16,
-            fontWeight: '700',
+            fontFamily: APP_FONTS.bold,
+            fontSize: 15,
+            lineHeight: 20,
           },
         };
       case 'md':
       default:
         return {
           container: {
-            height: 48,
+            minHeight: 46,
+            paddingVertical: 11,
             paddingHorizontal: APP_SPACING.lg,
             borderRadius: APP_RADIUS.md,
           },
           text: {
-            fontSize: 15,
-            fontWeight: '600',
+            fontFamily: APP_FONTS.bold,
+            fontSize: 14,
+            lineHeight: 19,
           },
         };
     }
@@ -176,6 +191,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      hitSlop={size === 'sm' ? 4 : 0}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || title}
       accessibilityState={{ disabled: disabled || loading }}
@@ -183,7 +199,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
         styles.baseContainer,
         variantStyle.container,
         sizeStyle.container,
-        fullWidth && styles.fullWidth,
+        fullWidth ? styles.fullWidth : styles.compactWidth,
         pressed && !disabled && !loading && styles.pressed,
         style,
       ]}>
@@ -202,7 +218,7 @@ export const CustomButton: React.FC<CustomButtonProps> = ({
               sizeStyle.text,
               textStyle,
             ]}
-            numberOfLines={2}>
+            numberOfLines={1}>
             {title}
           </Text>
           {rightIcon && <View style={styles.rightIconMargin}>{rightIcon}</View>}
@@ -218,14 +234,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    minHeight: 44, // Accessibility standard touch target
   },
   fullWidth: {
     width: '100%',
   },
+  compactWidth: {
+    alignSelf: 'flex-start',
+  },
   pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.985 }],
+    opacity: 0.82,
   },
   contentRow: {
     flexDirection: 'row',
@@ -238,12 +255,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   iconMargin: {
-    marginRight: APP_SPACING.sm,
+    marginRight: 6,
   },
   rightIconMargin: {
-    marginLeft: APP_SPACING.sm,
+    marginLeft: 6,
   },
 });
 
 export default CustomButton;
-

@@ -1,14 +1,11 @@
 /**
- * Fritz — LeaveClassificationBadge Component (Sprint 2)
- * Menampilkan badge hasil klasifikasi AI pada pengajuan izin praktikan
- * ('Sakit', 'Urusan Keluarga', 'Akademik/Lomba', 'Kendala Teknis', 'Alasan Kurang Kuat',
- * atau 'AI Tidak Merespon / Perlu Cek Manual') beserta tingkat urgensinya.
+ * LeaveClassificationBadge Component
  */
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import type { LeaveAIStatus, LeaveUrgencyLevel } from '@/types/leaveRequest';
-import { APP_RADIUS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS, APP_RADIUS } from '@/constants/theme';
 
 interface LeaveClassificationBadgeProps {
   classification: string;
@@ -27,45 +24,41 @@ export const LeaveClassificationBadge: React.FC<LeaveClassificationBadgeProps> =
 }) => {
   const clean = (classification || '').toLowerCase();
 
-  let backgroundColor = '#F1F5F9';
-  let textColor = '#475569';
-  let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'bulb-outline';
+  let backgroundColor: string = APP_COLORS.softBlue;
+  let textColor: string = APP_COLORS.inkPrimary;
+  let iconName: React.ComponentProps<typeof Ionicons>['name'] = 'information-circle-outline';
 
   if (aiStatus === 'FALLBACK' || clean.includes('tidak merespon') || clean.includes('manual')) {
-    backgroundColor = '#FEF3C7';
-    textColor = '#D97706';
+    backgroundColor = APP_COLORS.notOpenedSoft;
+    textColor = APP_COLORS.notOpened;
     iconName = 'warning-outline';
   } else if (clean.includes('sakit')) {
     backgroundColor = '#FCE7F3';
-    textColor = '#BE185D';
+    textColor = '#9D174D';
     iconName = 'medkit-outline';
   } else if (clean.includes('keluarga')) {
     backgroundColor = '#EDE9FE';
-    textColor = '#6D28D9';
+    textColor = '#5B21B6';
     iconName = 'people-outline';
   } else if (clean.includes('akademik') || clean.includes('lomba')) {
-    backgroundColor = '#DBEAFE';
-    textColor = '#1D4ED8';
+    backgroundColor = APP_COLORS.nordicBreeze;
+    textColor = APP_COLORS.inkPrimary;
     iconName = 'school-outline';
   } else if (clean.includes('teknis')) {
-    backgroundColor = '#E0F2FE';
-    textColor = '#0369A1';
+    backgroundColor = APP_COLORS.softBlue;
+    textColor = APP_COLORS.primary;
     iconName = 'construct-outline';
   } else if (clean.includes('kurang kuat')) {
-    backgroundColor = '#FEE2E2';
-    textColor = '#DC2626';
+    backgroundColor = APP_COLORS.dangerSoft;
+    textColor = APP_COLORS.dangerText;
     iconName = 'alert-circle-outline';
-  } else {
-    backgroundColor = '#E0E7FF';
-    textColor = '#4338CA';
-    iconName = 'bulb-outline';
   }
 
   const isSmall = size === 'sm';
   const displayLabel =
     urgency && urgency !== 'Perlu Cek Manual' && aiStatus === 'SUCCESS'
-      ? `AI: ${classification} (${urgency})`
-      : `AI: ${classification}`;
+      ? `${classification} (${urgency})`
+      : classification;
 
   return (
     <View
@@ -73,7 +66,7 @@ export const LeaveClassificationBadge: React.FC<LeaveClassificationBadgeProps> =
         styles.container,
         {
           backgroundColor,
-          paddingVertical: isSmall ? 3 : 5,
+          paddingVertical: isSmall ? 4 : 5,
           paddingHorizontal: isSmall ? 8 : 10,
         },
         style,
@@ -102,8 +95,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   text: {
-    fontWeight: '700',
-    letterSpacing: 0.2,
+    fontFamily: APP_FONTS.semiBold,
   },
 });
 

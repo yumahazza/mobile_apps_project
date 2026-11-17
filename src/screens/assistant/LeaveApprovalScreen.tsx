@@ -1,14 +1,8 @@
 /**
- * Fritz — LeaveApprovalScreen (Sprint 2)
- *
- * Halaman Pemeriksaan & Keputusan Izin untuk Asisten Praktikum (Kebutuhan #11):
- * - Menampilkan daftar pengajuan izin praktikan secara real-time (onSnapshot)
- * - Menampilkan nama praktikan, NIM, sesi, alasan izin, serta badge hasil klasifikasi AI
- * - Menyediakan tombol Terima ('DITERIMA') dan Tolak ('DITOLAK')
- * - Menyimpan keputusan ke Firestore secara real-time dan menyinkronkan status 'Izin'
- *   ke koleksi `attendances` jika disetujui.
+ * LeaveApprovalScreen
+ * Pemeriksaan & keputusan izin manual oleh Asisten Praktikum.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -24,11 +18,8 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useScheduleLeaveRequests } from '@/hooks/useRealtimeLeaveRequests';
 import { reviewLeaveRequest } from '@/services/leaveRequestService';
-import type { LeaveRequestItem } from '@/types/leaveRequest';
-import { Card } from '@/components/Card';
-import { CustomButton } from '@/components/CustomButton';
+import type { LeaveRequestItem, LeaveRequestStatus } from '@/types/leaveRequest';
 import { StatusBadge } from '@/components/StatusBadge';
-import { LeaveClassificationBadge } from '@/components/LeaveClassificationBadge';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
@@ -36,6 +27,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -44,10 +36,12 @@ interface LeaveApprovalScreenProps {
   navigation: NavigationProp;
 }
 
+type FilterStatus = 'ALL' | LeaveRequestStatus;
+
 export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   navigation,
 }) => {
-  const { activeUser, activeScheduleId } = useApp();
+  const { activeUser, activeScheduleId, setActiveScheduleId } = useApp();
   const {
     schedules,
     loading: schedulesLoading,
@@ -59,9 +53,14 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>(
     initialScheduleId,
   );
+  const [statusFilter, setStatusFilter] = useState<FilterStatus>('ALL');
 
   const currentSchedule =
-    schedules.find(s => s.id === selectedScheduleId) || schedules[0];
+    schedules.find((s) => s.id === selectedScheduleId) ||
+    (navigation.params?.scheduleId
+      ? schedules.find((s) => s.id === navigation.params?.scheduleId)
+      : schedules.find((s) => s.id === activeScheduleId)) ||
+    schedules[0];
 
   const {
     leaveRequests,
@@ -69,6 +68,7 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
     approvedCount,
     rejectedCount,
     loading: leavesLoading,
+    error: leavesError,
   } = useScheduleLeaveRequests(currentSchedule?.id);
 
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -81,6 +81,11 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
     item: null,
     decision: 'DITERIMA',
   });
+
+  const filteredRequests = useMemo(() => {
+    if (statusFilter === 'ALL') return leaveRequests;
+    return leaveRequests.filter((item) => item.status === statusFilter);
+  }, [leaveRequests, statusFilter]);
 
   const handlePromptDecision = (
     item: LeaveRequestItem,
@@ -115,10 +120,10 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
       );
     } catch (err) {
       Alert.alert(
-        'Gagal Memproses Keputusan',
+        'Gagal Memproses',
         err instanceof Error
           ? err.message
-          : 'Gagal menyimpan keputusan izin ke Cloud Firestore.',
+          : 'Gagal menyimpan keputusan izin.',
       );
     } finally {
       setProcessingId(null);
@@ -128,7 +133,8 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
-        title="Pemeriksaan Izin"
+        title="Review Izin"
+        subtitle="Persetujuan manual oleh asisten"
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -136,36 +142,34 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Pemilih Sesi Praktikum */}
-        <Text style={styles.sectionTitle}>Pilih Sesi Praktikum</Text>
+        <Text style={styles.sectionTitle}>Pilih Sesi</Text>
         {schedulesLoading ? (
-          <Card style={styles.card}>
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="small" color={APP_COLORS.primary} />
-              <Text style={styles.loadingText}>Memuat jadwal asisten...</Text>
-            </View>
-          </Card>
+          <View style={styles.stateCard}>
+            <ActivityIndicator size="small" color={APP_COLORS.primary} />
+            <Text style={styles.loadingText}>Memuat jadwal...</Text>
+          </View>
         ) : schedulesError ? (
-          <Card style={styles.card}>
+          <View style={styles.stateCard}>
             <Text style={styles.loadingText}>{schedulesError}</Text>
-          </Card>
+          </View>
         ) : schedules.length === 0 ? (
-          <Card style={styles.card}>
-            <Text style={styles.loadingText}>
-              Belum ada jadwal praktikum yang ditugaskan untuk akun asisten ini.
-            </Text>
-          </Card>
+          <View style={styles.stateCard}>
+            <Text style={styles.loadingText}>Belum ada jadwal tersedia.</Text>
+          </View>
         ) : (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.scheduleTabsRow}>
-            {schedules.map(item => {
+            {schedules.map((item) => {
               const isSelected = item.id === currentSchedule?.id;
               return (
                 <Pressable
                   key={item.id}
-                  onPress={() => setSelectedScheduleId(item.id)}
+                  onPress={() => {
+                    setSelectedScheduleId(item.id);
+                    setActiveScheduleId(item.id);
+                  }}
                   style={[
                     styles.scheduleChip,
                     isSelected && styles.scheduleChipActive,
@@ -174,7 +178,8 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
                     style={[
                       styles.scheduleChipTitle,
                       isSelected && styles.scheduleChipTitleActive,
-                    ]}>
+                    ]}
+                    numberOfLines={1}>
                     {item.courseName}
                   </Text>
                   <Text
@@ -182,7 +187,7 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
                       styles.scheduleChipSub,
                       isSelected && styles.scheduleChipSubActive,
                     ]}>
-                    {item.className} • {item.date}
+                    {item.className} · {item.date}
                   </Text>
                 </Pressable>
               );
@@ -190,148 +195,182 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
           </ScrollView>
         )}
 
-        {/* Ringkasan Statistik Pengajuan Izin Sesi */}
-        <View style={styles.statsRow}>
-          <View style={[styles.statBox, styles.statBoxPending]}>
-            <Text style={styles.statValue}>{pendingCount}</Text>
+        {/* Strip Ringkasan 1 Baris */}
+        <View style={styles.summaryStrip}>
+          <Pressable
+            onPress={() => setStatusFilter('MENUNGGU')}
+            style={({ pressed }) => [
+              styles.summaryCell,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.statValue, { color: APP_COLORS.warning }]}>
+              {pendingCount}
+            </Text>
             <Text style={styles.statLabel}>Menunggu</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxApproved]}>
-            <Text style={styles.statValue}>{approvedCount}</Text>
+          </Pressable>
+          <View style={styles.summaryDivider} />
+          <Pressable
+            onPress={() => setStatusFilter('DITERIMA')}
+            style={({ pressed }) => [
+              styles.summaryCell,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.statValue, { color: APP_COLORS.opened }]}>
+              {approvedCount}
+            </Text>
             <Text style={styles.statLabel}>Diterima</Text>
-          </View>
-          <View style={[styles.statBox, styles.statBoxRejected]}>
-            <Text style={styles.statValue}>{rejectedCount}</Text>
+          </Pressable>
+          <View style={styles.summaryDivider} />
+          <Pressable
+            onPress={() => setStatusFilter('DITOLAK')}
+            style={({ pressed }) => [
+              styles.summaryCell,
+              pressed && styles.pressed,
+            ]}>
+            <Text style={[styles.statValue, { color: APP_COLORS.dangerText }]}>
+              {rejectedCount}
+            </Text>
             <Text style={styles.statLabel}>Ditolak</Text>
-          </View>
+          </Pressable>
         </View>
 
-        {/* Daftar Pengajuan Izin */}
+        {/* Filter Pills */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterPillsRow}>
+          {[
+            { key: 'ALL' as FilterStatus, label: `Semua (${leaveRequests.length})` },
+            { key: 'MENUNGGU' as FilterStatus, label: `Menunggu (${pendingCount})` },
+            { key: 'DITERIMA' as FilterStatus, label: `Diterima (${approvedCount})` },
+            { key: 'DITOLAK' as FilterStatus, label: `Ditolak (${rejectedCount})` },
+          ].map((pill) => {
+            const active = statusFilter === pill.key;
+            return (
+              <Pressable
+                key={pill.key}
+                onPress={() => setStatusFilter(pill.key)}
+                style={[styles.filterPill, active && styles.filterPillActive]}>
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    active && styles.filterPillTextActive,
+                  ]}>
+                  {pill.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>Daftar Pengajuan Izin Mahasiswa</Text>
+          <Text style={styles.sectionTitle}>Daftar Pengajuan</Text>
           {leavesLoading && (
             <ActivityIndicator size="small" color={APP_COLORS.primary} />
           )}
         </View>
 
-        {leaveRequests.length === 0 ? (
-          <Card style={styles.emptyCard}>
-            <EmptyState
-              icon="document-text-outline"
-              title="Belum Ada Pengajuan Izin"
-              description="Pengajuan izin dari praktikan pada sesi ini beserta klasifikasi AI akan muncul secara real-time di sini."
-            />
-          </Card>
+        {leavesError ? (
+          <EmptyState
+            icon="alert-circle-outline"
+            title="Gagal Memuat Izin"
+            description={leavesError}
+          />
+        ) : filteredRequests.length === 0 ? (
+          <EmptyState
+            icon="document-text-outline"
+            title="Belum Ada Pengajuan"
+            description="Pengajuan izin praktikan pada sesi ini akan tampil di sini."
+          />
         ) : (
           <View style={styles.listContainer}>
-            {leaveRequests.map(item => {
+            {filteredRequests.map((item) => {
               const isProcessing = processingId === item.id;
               const sessionTitle =
-                item.courseName || currentSchedule?.courseName || 'Praktikum';
+                currentSchedule?.courseName || item.courseName || 'Praktikum';
               const sessionClass =
-                item.className || currentSchedule?.className || '';
+                currentSchedule?.className || item.className || '';
+              const studentInitial = (item.studentName || 'M')
+                .charAt(0)
+                .toUpperCase();
 
               return (
-                <Card key={item.id} style={styles.itemCard}>
-                  {/* Baris Atas: Identitas Praktikan & Status */}
+                <View key={item.id} style={styles.itemCard}>
                   <View style={styles.itemHeaderRow}>
+                    <View style={styles.studentAvatar}>
+                      <Text style={styles.studentAvatarText}>
+                        {studentInitial}
+                      </Text>
+                    </View>
                     <View style={styles.studentInfoCol}>
                       <Text style={styles.studentName}>{item.studentName}</Text>
-                      <Text style={styles.studentMeta}>
-                        NIM {item.nim} • {sessionTitle}{' '}
-                        {sessionClass ? `(${sessionClass})` : ''}
+                      <Text style={styles.studentMeta} numberOfLines={1}>
+                        NIM {item.nim} · {sessionTitle}
+                        {sessionClass ? ` (${sessionClass})` : ''}
                       </Text>
-                      <Text style={styles.timestampText}>
-                        Diajukan: {item.createdAt}
-                      </Text>
+                      <Text style={styles.timestampText}>{item.createdAt}</Text>
                     </View>
                     <StatusBadge status={item.status} size="sm" />
                   </View>
 
-                  {/* Klasifikasi AI Badge & Ringkasan */}
-                  <View style={styles.aiSection}>
-                    <LeaveClassificationBadge
-                      classification={item.aiClassification}
-                      aiStatus={item.aiStatus}
-                      urgency={item.aiUrgency}
-                      size="md"
-                    />
-                    <Text style={styles.aiSummaryText}>{item.aiSummary}</Text>
-                  </View>
-
-                  {/* Alasan Ketidakhadiran */}
                   <View style={styles.reasonBox}>
-                    <Text style={styles.reasonLabel}>Alasan Praktikan:</Text>
-                    <Text style={styles.reasonText}>&quot;{item.reason}&quot;</Text>
+                    <Text style={styles.reasonLabel}>Alasan Izin</Text>
+                    <Text style={styles.reasonText}>“{item.reason}”</Text>
                   </View>
 
-                  {/* Info Reviewer jika sudah diproses */}
                   {item.reviewedBy ? (
                     <Text style={styles.reviewedByText}>
-                      Diputuskan oleh: {item.reviewedBy}{' '}
-                      {item.reviewedAt ? `• ${item.reviewedAt}` : ''}
+                      Direview: {item.reviewedBy}
+                      {item.reviewedAt ? ` · ${item.reviewedAt}` : ''}
                     </Text>
                   ) : null}
 
-                  {/* Tombol Keputusan Terima / Tolak (hanya saat MENUNGGU) */}
                   {item.status === 'MENUNGGU' ? (
                     <View style={styles.decisionRow}>
-                      <View style={styles.decisionBtnCol}>
-                        <CustomButton
-                          title="Tolak"
-                          variant="outline"
-                          size="md"
-                          disabled={isProcessing}
-                          leftIcon={
+                      <Pressable
+                        disabled={isProcessing}
+                        onPress={() => handlePromptDecision(item, 'DITOLAK')}
+                        style={({ pressed }) => [
+                          styles.rejectBtn,
+                          pressed && styles.pressed,
+                        ]}>
+                        <Ionicons
+                          name="close-circle-outline"
+                          size={16}
+                          color={APP_COLORS.dangerText}
+                        />
+                        <Text style={styles.rejectBtnText}>Tolak</Text>
+                      </Pressable>
+
+                      <Pressable
+                        disabled={isProcessing}
+                        onPress={() => handlePromptDecision(item, 'DITERIMA')}
+                        style={({ pressed }) => [
+                          styles.approveBtn,
+                          pressed && styles.pressed,
+                        ]}>
+                        {isProcessing ? (
+                          <ActivityIndicator size="small" color={APP_COLORS.white} />
+                        ) : (
+                          <>
                             <Ionicons
-                              name="close-circle-outline"
+                              name="checkmark-circle-outline"
                               size={16}
-                              color={APP_COLORS.danger}
+                              color={APP_COLORS.white}
                             />
-                          }
-                          onPress={() => handlePromptDecision(item, 'DITOLAK')}
-                        />
-                      </View>
-                      <View style={styles.decisionBtnCol}>
-                        <CustomButton
-                          title="Terima"
-                          variant="primary"
-                          size="md"
-                          loading={isProcessing}
-                          disabled={isProcessing}
-                          leftIcon={
-                            !isProcessing ? (
-                              <Ionicons
-                                name="checkmark-circle-outline"
-                                size={16}
-                                color={APP_COLORS.white}
-                              />
-                            ) : undefined
-                          }
-                          onPress={() => handlePromptDecision(item, 'DITERIMA')}
-                        />
-                      </View>
+                            <Text style={styles.approveBtnText}>Terima</Text>
+                          </>
+                        )}
+                      </Pressable>
                     </View>
-                  ) : (
-                    <View style={styles.decisionLockedBox}>
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={14}
-                        color={APP_COLORS.textSecondary}
-                      />
-                      <Text style={styles.decisionLockedText}>
-                        Keputusan izin sudah final ({item.status}) dan tidak dapat diubah.
-                      </Text>
-                    </View>
-                  )}
-                </Card>
+                  ) : null}
+                </View>
               );
             })}
           </View>
         )}
       </ScrollView>
 
-      {/* Modal Konfirmasi Keputusan Asisten */}
       <ConfirmModal
         visible={confirmDecision.visible}
         title={
@@ -341,21 +380,19 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
         }
         subtitle={
           confirmDecision.decision === 'DITERIMA'
-            ? `Pengajuan izin dari ${confirmDecision.item?.studentName || 'praktikan'} akan disetujui (DITERIMA) dan status kehadiran otomatis tercatat sebagai Izin pada rekap presensi.`
-            : `Pengajuan izin dari ${confirmDecision.item?.studentName || 'praktikan'} akan ditolak (DITOLAK).`
+            ? `Status izin ${confirmDecision.item?.studentName} akan disimpan sebagai DITERIMA.`
+            : `Status izin ${confirmDecision.item?.studentName} akan disimpan sebagai DITOLAK.`
         }
         details={{
           courseName:
-            confirmDecision.item?.courseName || currentSchedule?.courseName,
+            currentSchedule?.courseName || confirmDecision.item?.courseName,
           className:
-            confirmDecision.item?.className || currentSchedule?.className,
+            currentSchedule?.className || confirmDecision.item?.className,
           time: currentSchedule?.time,
           room: currentSchedule?.room,
         }}
         confirmText={
-          confirmDecision.decision === 'DITERIMA'
-            ? 'Ya, Terima Izin'
-            : 'Ya, Tolak Izin'
+          confirmDecision.decision === 'DITERIMA' ? 'Ya, Terima' : 'Ya, Tolak'
         }
         cancelText="Batal"
         confirmVariant={
@@ -363,14 +400,18 @@ export const LeaveApprovalScreen: React.FC<LeaveApprovalScreenProps> = ({
         }
         onConfirm={handleConfirmDecision}
         onCancel={() =>
-          setConfirmDecision({ visible: false, item: null, decision: 'DITERIMA' })
+          setConfirmDecision({
+            visible: false,
+            item: null,
+            decision: 'DITERIMA',
+          })
         }
       />
 
       <BottomNavigation
         role="assistant"
         activeTab="AssistantHome"
-        onTabChange={tabKey => navigation.navigate(tabKey)}
+        onTabChange={(tabKey) => navigation.navigate(tabKey)}
       />
     </SafeAreaView>
   );
@@ -383,119 +424,134 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   sectionTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 16,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: APP_SPACING.sm,
   },
-  card: {
-    padding: APP_SPACING.md,
+  stateCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
     marginBottom: APP_SPACING.md,
   },
-  loadingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: APP_SPACING.sm,
-  },
   loadingText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
+    flex: 1,
   },
   scheduleTabsRow: {
-    gap: APP_SPACING.sm,
+    flexDirection: 'row',
+    gap: 8,
     paddingBottom: APP_SPACING.md,
   },
   scheduleChip: {
-    paddingVertical: 10,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    paddingVertical: 10,
+    borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    minWidth: 160,
+    minWidth: 150,
   },
   scheduleChipActive: {
     backgroundColor: APP_COLORS.primary,
     borderColor: APP_COLORS.primary,
   },
   scheduleChipTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 13,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   scheduleChipTitleActive: {
     color: APP_COLORS.white,
   },
   scheduleChipSub: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
     color: APP_COLORS.textSecondary,
     marginTop: 2,
   },
   scheduleChipSubActive: {
-    color: '#DBEAFE',
+    color: APP_COLORS.nordicBreeze,
   },
-  statsRow: {
+  summaryStrip: {
     flexDirection: 'row',
-    gap: APP_SPACING.sm,
-    marginBottom: APP_SPACING.lg,
-  },
-  statBox: {
-    flex: 1,
-    paddingVertical: APP_SPACING.sm,
-    paddingHorizontal: APP_SPACING.sm,
-    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: APP_COLORS.white,
+    borderRadius: APP_RADIUS.card,
     borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    paddingVertical: APP_SPACING.md,
+    marginBottom: APP_SPACING.md,
+  },
+  summaryCell: {
+    flex: 1,
     alignItems: 'center',
   },
-  statBoxPending: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
-  },
-  statBoxApproved: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#BBF7D0',
-  },
-  statBoxRejected: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#FECACA',
+  summaryDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: APP_COLORS.divider,
   },
   statValue: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 18,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
   },
   statLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
     color: APP_COLORS.textSecondary,
     marginTop: 2,
+  },
+  filterPillsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: APP_SPACING.md,
+  },
+  filterPill: {
+    minHeight: 38,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: APP_RADIUS.pill,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+  },
+  filterPillActive: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  filterPillText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+  },
+  filterPillTextActive: {
+    color: APP_COLORS.white,
   },
   listHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: APP_SPACING.sm,
-  },
-  emptyCard: {
-    padding: APP_SPACING.sm,
-    borderRadius: APP_RADIUS.card,
-    backgroundColor: APP_COLORS.white,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
+    marginBottom: 4,
   },
   listContainer: {
     gap: APP_SPACING.md,
   },
   itemCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -504,90 +560,106 @@ const styles = StyleSheet.create({
   itemHeaderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: APP_SPACING.sm,
+    marginBottom: APP_SPACING.md,
+  },
+  studentAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: APP_COLORS.nordicBreeze,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  studentAvatarText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
   },
   studentInfoCol: {
     flex: 1,
+    marginRight: 8,
   },
   studentName: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   studentMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
-    marginTop: 2,
+    marginTop: 1,
   },
   timestampText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
     color: APP_COLORS.textMuted,
     marginTop: 2,
   },
-  aiSection: {
-    marginTop: APP_SPACING.sm,
-    padding: APP_SPACING.sm,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-    gap: 4,
-  },
-  aiSummaryText: {
-    fontSize: 11,
-    color: APP_COLORS.textSecondary,
-    lineHeight: 16,
-  },
   reasonBox: {
-    marginTop: APP_SPACING.sm,
-    padding: APP_SPACING.sm,
-    backgroundColor: '#FFFBEB',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FEF3C7',
+    backgroundColor: APP_COLORS.surfaceSubtle,
+    borderRadius: APP_RADIUS.md,
+    padding: APP_SPACING.md,
+    borderLeftWidth: 3,
+    borderLeftColor: APP_COLORS.primary,
+    marginBottom: APP_SPACING.sm,
   },
   reasonLabel: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 11,
-    fontWeight: '700',
-    color: '#92400E',
-    marginBottom: 2,
+    color: APP_COLORS.textSecondary,
+    marginBottom: 3,
   },
   reasonText: {
-    fontSize: 13,
-    color: APP_COLORS.navyHeading,
-    fontStyle: 'italic',
-    lineHeight: 18,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 20,
   },
   reviewedByText: {
-    marginTop: APP_SPACING.xs,
-    fontSize: 11,
-    color: APP_COLORS.textSecondary,
-  },
-  decisionRow: {
-    marginTop: APP_SPACING.md,
-    flexDirection: 'row',
-    gap: APP_SPACING.sm,
-  },
-  decisionBtnCol: {
-    flex: 1,
-  },
-  decisionLockedBox: {
-    marginTop: APP_SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: APP_COLORS.border,
-  },
-  decisionLockedText: {
-    flex: 1,
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
+    marginTop: 2,
+  },
+  decisionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: APP_SPACING.sm,
+  },
+  rejectBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.dangerSoft,
+  },
+  rejectBtnText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.dangerText,
+  },
+  approveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.primary,
+  },
+  approveBtnText: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.white,
+  },
+  pressed: {
+    opacity: 0.78,
   },
 });
 

@@ -6,6 +6,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,16 +18,16 @@ import {
   subscribeToSingleSchedule,
 } from '@/services/sessionControlService';
 import type { PracticumSchedule } from '@/services/practicumScheduleService';
-import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { StatusBadge } from '@/components/StatusBadge';
-import { CustomButton } from '@/components/CustomButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -40,20 +41,28 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
 }) => {
   const {
     activeScheduleId,
+    setActiveScheduleId,
     activeUser,
     activeRole,
   } = useApp();
 
-  const { schedules, loading: schedulesLoading, error: schedulesError } =
-    useFirestoreSchedules(activeUser.id, 'assistant');
+  const {
+    schedules,
+    loading: schedulesLoading,
+    error: schedulesError,
+  } = useFirestoreSchedules(activeUser.id, 'assistant');
+
+  const [selectedId, setSelectedId] = useState<string>(
+    navigation.params?.scheduleId || activeScheduleId || '',
+  );
 
   const selectedFromList =
-    schedules.find(s => s.id === navigation.params?.scheduleId) ||
-    schedules.find(s => s.id === activeScheduleId) ||
+    schedules.find((s) => s.id === selectedId) ||
+    schedules.find((s) => s.id === navigation.params?.scheduleId) ||
+    schedules.find((s) => s.id === activeScheduleId) ||
     schedules[0];
 
-  const targetScheduleId =
-    navigation.params?.scheduleId || selectedFromList?.id || '';
+  const targetScheduleId = selectedFromList?.id || '';
 
   const [realtimeState, setRealtimeState] = useState<{
     id: string;
@@ -61,15 +70,13 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
   }>({ id: '', schedule: null });
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
-  // Berlangganan dokumen jadwal spesifik di Firestore secara real-time
   useEffect(() => {
     if (!targetScheduleId) return undefined;
     const activeId = targetScheduleId;
     const unsubscribe = subscribeToSingleSchedule(
       activeId,
-      schedule => setRealtimeState({ id: activeId, schedule }),
-      err => {
-        // Fallback jika listener gagal
+      (schedule) => setRealtimeState({ id: activeId, schedule }),
+      (err) => {
         console.warn('Realtime schedule subscription error:', err);
       },
     );
@@ -91,14 +98,6 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
     action: 'open',
   });
 
-  const handleOpenModal = () => {
-    setConfirmModal({ visible: true, action: 'open' });
-  };
-
-  const handleCloseModal = () => {
-    setConfirmModal({ visible: true, action: 'close' });
-  };
-
   const handleConfirmAction = async () => {
     if (!currentSchedule) return;
     const action = confirmModal.action;
@@ -107,16 +106,24 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
     try {
       setIsSaving(true);
       if (action === 'open') {
-        const result = await openPracticumSession(currentSchedule.id, activeUser.id);
+        const result = await openPracticumSession(
+          currentSchedule.id,
+          activeUser.id,
+        );
         Alert.alert('Sesi Dibuka', result.message);
       } else {
-        const result = await closePracticumSession(currentSchedule.id, activeUser.id);
+        const result = await closePracticumSession(
+          currentSchedule.id,
+          activeUser.id,
+        );
         Alert.alert('Sesi Ditutup', result.message);
       }
     } catch (error) {
       Alert.alert(
         'Operasi Gagal',
-        error instanceof Error ? error.message : 'Gagal memperbarui status sesi di Firestore.',
+        error instanceof Error
+          ? error.message
+          : 'Gagal memperbarui status sesi.',
       );
     } finally {
       setIsSaving(false);
@@ -129,9 +136,9 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Kontrol Sesi"
+        subtitle="Buka atau tutup presensi praktikum"
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -139,23 +146,17 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Loading Banner when Firestore is updating */}
         {isSaving && (
           <View style={styles.loadingBanner}>
             <ActivityIndicator size="small" color={APP_COLORS.primary} />
-            <Text style={styles.loadingBannerText}>
-              Memperbarui status sesi di Cloud Firestore...
-            </Text>
+            <Text style={styles.loadingBannerText}>Memperbarui sesi...</Text>
           </View>
         )}
 
-        {/* Empty / Loading / Error State when no schedule */}
         {schedulesLoading && !currentSchedule ? (
           <View style={styles.loadingBanner}>
             <ActivityIndicator size="small" color={APP_COLORS.primary} />
-            <Text style={styles.loadingBannerText}>
-              Memuat jadwal sesi dari Cloud Firestore...
-            </Text>
+            <Text style={styles.loadingBannerText}>Memuat jadwal...</Text>
           </View>
         ) : schedulesError && !currentSchedule ? (
           <EmptyState
@@ -166,119 +167,181 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
         ) : !currentSchedule ? (
           <EmptyState
             icon="calendar-outline"
-            title="Belum Ada Sesi Praktikum"
-            description="Buat jadwal praktikum terlebih dahulu di menu Jadwal sebelum membuka sesi presensi."
+            title="Belum Ada Sesi"
+            description="Buat jadwal praktikum di menu Jadwal."
           />
         ) : (
           <>
-            {/* Session Info Card */}
-            <Card style={styles.sessionCard}>
-              <View style={styles.sessionRow}>
-                <View style={styles.sessionIconBox}>
-                  <Ionicons name="lock-closed" size={18} color={APP_COLORS.primary} />
-                </View>
-                <View style={styles.sessionTextCol}>
-                  <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
-                  <Text style={styles.sessionMeta}>
-                    {currentSchedule.time} | {currentSchedule.room}
+            {schedules.length > 1 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scheduleTabsRow}>
+                {schedules.map((item) => {
+                  const isSelected = item.id === currentSchedule.id;
+                  return (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        setSelectedId(item.id);
+                        setActiveScheduleId(item.id);
+                      }}
+                      style={[
+                        styles.scheduleChip,
+                        isSelected && styles.scheduleChipActive,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.scheduleChipTitle,
+                          isSelected && styles.scheduleChipTitleActive,
+                        ]}
+                        numberOfLines={1}>
+                        {item.courseName}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.scheduleChipSub,
+                          isSelected && styles.scheduleChipSubActive,
+                        ]}>
+                        {item.className} · {item.date}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
+
+            {/* Status Hero Card */}
+            <View
+              style={[
+                styles.statusCard,
+                isOpened && styles.statusCardOpen,
+              ]}>
+              <View style={styles.cardTopRow}>
+                <View
+                  style={[
+                    styles.classPill,
+                    isOpened && styles.classPillDark,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.classPillText,
+                      isOpened && styles.classPillTextDark,
+                    ]}>
+                    {currentSchedule.className}
                   </Text>
                 </View>
+                <StatusBadge status={currentSchedule.status} size="sm" />
               </View>
-            </Card>
 
-            {/* Status Sesi Card */}
-            <Card style={styles.statusCard}>
-              <Text style={styles.statusCardTitle}>Status Sesi</Text>
-              <View style={styles.statusBadgeRow}>
-                <StatusBadge status={currentSchedule.status} size="md" />
-              </View>
-              <Text style={styles.statusDescText}>
-                {isOpened
-                  ? 'Sesi sedang berlangsung. Praktikan dapat melakukan presensi.'
-                  : isNotOpened
-                  ? 'Sesi belum dimulai. Praktikan belum dapat melakukan presensi.'
-                  : 'Sesi telah ditutup & selesai. Presensi telah dinonaktifkan.'}
+              <Text
+                style={[
+                  styles.courseName,
+                  isOpened && styles.courseNameOpen,
+                ]}>
+                {currentSchedule.courseName}
               </Text>
-            </Card>
 
-            {/* Action Buttons Section */}
-            <View style={styles.actionButtonsContainer}>
+              <Text
+                style={[
+                  styles.courseMeta,
+                  isOpened && styles.courseMetaOpen,
+                ]}>
+                {currentSchedule.time} · {currentSchedule.room} · {currentSchedule.date}
+              </Text>
+
+              <View
+                style={[
+                  styles.divider,
+                  isOpened && styles.dividerOpen,
+                ]}
+              />
+
+              <Text
+                style={[
+                  styles.statusDescText,
+                  isOpened && styles.statusDescTextOpen,
+                ]}>
+                {isOpened
+                  ? 'Sesi aktif. Praktikan terdaftar dapat mengirim presensi.'
+                  : isNotOpened
+                  ? 'Sesi belum dimulai. Buka sesi agar presensi aktif.'
+                  : 'Sesi selesai. Presensi ditutup dan ulasan dibuka.'}
+              </Text>
+            </View>
+
+            {/* Tombol Kontrol Sesi */}
+            <View style={styles.actionContainer}>
               {isNotOpened && (
                 <CustomButton
-                  title={isSaving ? 'Menyimpan...' : 'Buka Sesi'}
+                  title="Buka Sesi Presensi"
                   variant="primary"
                   size="lg"
+                  loading={isSaving}
                   disabled={isSaving || schedulesLoading}
                   leftIcon={
-                    isSaving ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Ionicons name="play" size={18} color={APP_COLORS.white} />
-                    )
+                    <Ionicons
+                      name="play-circle-outline"
+                      size={18}
+                      color={APP_COLORS.white}
+                    />
                   }
-                  onPress={handleOpenModal}
+                  onPress={() => setConfirmModal({ visible: true, action: 'open' })}
                 />
               )}
 
               {isOpened && (
                 <CustomButton
-                  title={isSaving ? 'Menyimpan...' : 'Tutup & Selesaikan Sesi'}
+                  title="Tutup & Selesaikan Sesi"
                   variant="danger"
                   size="lg"
+                  loading={isSaving}
                   disabled={isSaving || schedulesLoading}
                   leftIcon={
-                    isSaving ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Ionicons name="power-outline" size={18} color={APP_COLORS.white} />
-                    )
+                    <Ionicons
+                      name="stop-circle-outline"
+                      size={18}
+                      color={APP_COLORS.white}
+                    />
                   }
-                  onPress={handleCloseModal}
+                  onPress={() => setConfirmModal({ visible: true, action: 'close' })}
                 />
               )}
 
               {isFinished && (
-                <CustomButton
-                  title="Sesi Telah Selesai"
-                  variant="outline"
-                  disabled
-                  size="lg"
-                  leftIcon={
-                    <Ionicons
-                      name="checkmark-done"
-                      size={18}
-                      color={APP_COLORS.neutral500}
-                    />
-                  }
-                  onPress={() => {}}
-                />
+                <View style={styles.finishedBox}>
+                  <Ionicons
+                    name="checkmark-done-circle"
+                    size={18}
+                    color={APP_COLORS.opened}
+                  />
+                  <Text style={styles.finishedText}>Sesi Selesai</Text>
+                </View>
               )}
             </View>
 
-            {/* Blue Info Callout Box */}
+            {/* Catatan Singkat */}
             <View style={styles.infoCallout}>
               <Ionicons
-                name="information-circle"
-                size={20}
+                name="information-circle-outline"
+                size={18}
                 color={APP_COLORS.primary}
-                style={styles.infoIcon}
               />
               <Text style={styles.infoCalloutText}>
-                Setelah sesi ditutup, presensi tidak dapat dilakukan lagi oleh praktikan.
+                Perubahan status bersifat satu arah dan tidak dapat dibuka ulang setelah ditutup.
               </Text>
             </View>
           </>
         )}
       </ScrollView>
 
-      {/* Confirmation Modal */}
       <ConfirmModal
         visible={confirmModal.visible}
         title={confirmModal.action === 'open' ? 'Buka Sesi?' : 'Tutup Sesi?'}
         subtitle={
           confirmModal.action === 'open'
-            ? 'Praktikan akan dapat melakukan presensi kehadiran setelah sesi dibuka.'
-            : 'Setelah sesi ditutup, praktikan tidak dapat melakukan presensi lagi.'
+            ? 'Praktikan dapat langsung melakukan presensi.'
+            : 'Presensi akan ditutup setelah sesi berakhir.'
         }
         details={{
           courseName: currentSchedule?.courseName,
@@ -293,7 +356,6 @@ export const SessionControlScreen: React.FC<SessionControlScreenProps> = ({
         onCancel={() => setConfirmModal({ visible: false, action: 'open' })}
       />
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab="AssistantHome"
@@ -310,105 +372,163 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
+  },
+  scheduleTabsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: APP_SPACING.md,
+  },
+  scheduleChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: APP_RADIUS.card,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    minWidth: 150,
+  },
+  scheduleChipActive: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  scheduleChipTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.inkPrimary,
+  },
+  scheduleChipTitleActive: {
+    color: APP_COLORS.white,
+  },
+  scheduleChipSub: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 11,
+    color: APP_COLORS.textSecondary,
+    marginTop: 2,
+  },
+  scheduleChipSubActive: {
+    color: APP_COLORS.nordicBreeze,
   },
   loadingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: APP_SPACING.sm,
-    backgroundColor: APP_COLORS.softBlue,
+    backgroundColor: APP_COLORS.white,
     padding: APP_SPACING.md,
     borderRadius: APP_RADIUS.card,
     marginBottom: APP_SPACING.md,
     borderWidth: 1,
-    borderColor: APP_COLORS.lightBlue,
+    borderColor: APP_COLORS.border,
   },
   loadingBannerText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
-    color: APP_COLORS.primary,
-    fontWeight: '600',
+    color: APP_COLORS.inkPrimary,
   },
-  sessionCard: {
-    padding: APP_SPACING.md,
-    borderRadius: APP_RADIUS.card,
+  statusCard: {
+    padding: APP_SPACING.xl,
+    borderRadius: APP_RADIUS.hero,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.md,
+    marginBottom: APP_SPACING.lg,
   },
-  sessionRow: {
+  statusCardOpen: {
+    backgroundColor: APP_COLORS.intergalactic,
+    borderColor: APP_COLORS.intergalactic,
+  },
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: APP_SPACING.md,
   },
-  sessionIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: APP_COLORS.softBlue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: APP_SPACING.md,
+  classPill: {
+    backgroundColor: APP_COLORS.nordicBreeze,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: APP_RADIUS.pill,
   },
-  sessionTextCol: {
-    flex: 1,
+  classPillDark: {
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+  },
+  classPillText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.inkPrimary,
+  },
+  classPillTextDark: {
+    color: APP_COLORS.white,
   },
   courseName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: 2,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 20,
+    lineHeight: 26,
+    color: APP_COLORS.inkPrimary,
+    marginBottom: 4,
   },
-  sessionMeta: {
+  courseNameOpen: {
+    color: APP_COLORS.durantaYellow,
+  },
+  courseMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
   },
-  statusCard: {
-    padding: APP_SPACING.lg,
-    borderRadius: APP_RADIUS.card,
+  courseMetaOpen: {
+    color: 'rgba(255, 255, 255, 0.88)',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: APP_COLORS.divider,
+    marginVertical: APP_SPACING.md,
+  },
+  dividerOpen: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  statusDescText: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  statusDescTextOpen: {
+    color: APP_COLORS.white,
+  },
+  actionContainer: {
+    marginBottom: APP_SPACING.lg,
+  },
+  finishedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    marginBottom: APP_SPACING.lg,
+    borderRadius: APP_RADIUS.md,
+    minHeight: 48,
+    paddingVertical: 12,
   },
-  statusCardTitle: {
+  finishedText: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
-    marginBottom: APP_SPACING.sm,
-  },
-  statusBadgeRow: {
-    marginVertical: 4,
-  },
-  statusDescText: {
-    fontSize: 13,
-    color: APP_COLORS.textSecondary,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  actionButtonsContainer: {
-    gap: APP_SPACING.sm,
-    marginBottom: APP_SPACING.lg,
-  },
-  secondaryActionBtn: {
-    marginTop: 2,
+    color: APP_COLORS.inkPrimary,
   },
   infoCallout: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: APP_SPACING.sm,
     backgroundColor: APP_COLORS.softBlue,
-    borderWidth: 1,
-    borderColor: APP_COLORS.lightBlue,
-    borderRadius: 10,
+    borderRadius: APP_RADIUS.md,
     padding: APP_SPACING.md,
-  },
-  infoIcon: {
-    marginRight: APP_SPACING.sm,
   },
   infoCalloutText: {
     flex: 1,
+    fontFamily: APP_FONTS.regular,
     fontSize: 12,
-    color: APP_COLORS.textPrimary,
+    color: APP_COLORS.textSecondary,
     lineHeight: 18,
   },
 });

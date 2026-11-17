@@ -22,6 +22,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -44,7 +45,7 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
 
   const targetScheduleId = navigation.params?.scheduleId || activeScheduleId;
   const currentSchedule =
-    schedules.find(schedule => schedule.id === targetScheduleId) || schedules[0];
+    schedules.find((schedule) => schedule.id === targetScheduleId) || schedules[0];
 
   const {
     attendances: attendanceLogs,
@@ -61,15 +62,19 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
     return attendanceLogs.filter(
       (log) =>
         log.studentName.toLowerCase().includes(q) ||
-        (log.nim && log.nim.toLowerCase().includes(q))
+        (log.nim && log.nim.toLowerCase().includes(q)),
     );
   }, [attendanceLogs, searchQuery]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Daftar Mahasiswa"
+        subtitle={
+          currentSchedule
+            ? `${currentSchedule.courseName} · ${currentSchedule.className}`
+            : 'Peserta & presensi'
+        }
         onBack={() => navigation.goBack()}
         onNotificationPress={() => navigation.navigate('Notifications')}
       />
@@ -77,17 +82,16 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
-        {/* Session Info Card */}
         {currentSchedule && (
           <Card style={styles.sessionCard}>
             <View style={styles.sessionRow}>
               <View style={styles.iconBox}>
-                <Ionicons name="book" size={18} color={APP_COLORS.primary} />
+                <Ionicons name="book-outline" size={18} color={APP_COLORS.primary} />
               </View>
               <View style={styles.sessionTextCol}>
                 <Text style={styles.courseName}>{currentSchedule.courseName}</Text>
                 <Text style={styles.sessionMeta}>
-                  {currentSchedule.time} | {currentSchedule.room}
+                  {currentSchedule.time} · {currentSchedule.room}
                 </Text>
               </View>
             </View>
@@ -95,18 +99,16 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
         )}
 
         {schedulesLoading && (
-          <Text style={styles.loadingMessage}>Memuat jadwal dari Firestore...</Text>
+          <Text style={styles.loadingMessage}>Memuat jadwal...</Text>
         )}
         {!!schedulesError && (
           <Text style={styles.errorMessage}>{schedulesError}</Text>
         )}
 
-        {/* Birela: daftar peserta kelas yang disinkronkan ke Firestore */}
         {currentSchedule && <ParticipantRoster schedule={currentSchedule} />}
 
-        {/* Search Field */}
         <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={APP_COLORS.neutral500} />
+          <Ionicons name="search" size={18} color={APP_COLORS.textSecondary} />
           <TextInput
             style={styles.searchInput}
             placeholder="Cari nama atau NIM..."
@@ -121,18 +123,21 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
               onPress={() => setSearchQuery('')}
               hitSlop={8}
               style={styles.clearBtn}>
-              <Ionicons name="close-circle" size={16} color={APP_COLORS.neutral500} />
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={APP_COLORS.textSecondary}
+              />
             </Pressable>
           )}
         </View>
 
-        {/* Students Table or Empty State */}
         {attendancesError ? (
           <Text style={styles.errorMessage}>{attendancesError}</Text>
         ) : attendancesLoading ? (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color={APP_COLORS.primary} />
-            <Text style={styles.loadingRowText}>Memuat presensi dari Firestore...</Text>
+            <Text style={styles.loadingRowText}>Memuat presensi...</Text>
           </View>
         ) : filteredLogs.length === 0 ? (
           <EmptyState
@@ -140,17 +145,16 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
             title={
               searchQuery.trim()
                 ? 'Mahasiswa Tidak Ditemukan'
-                : 'Belum Ada Mahasiswa Hadir'
+                : 'Belum Ada Presensi'
             }
             description={
               searchQuery.trim()
-                ? `Tidak ada data presensi yang cocok dengan kata kunci "${searchQuery}".`
-                : 'Belum ada data kehadiran praktikan yang tercatat pada sesi ini.'
+                ? `Tidak ada data untuk "${searchQuery}".`
+                : 'Belum ada data kehadiran pada sesi ini.'
             }
           />
         ) : (
           <View style={styles.tableCard}>
-            {/* Table Header */}
             <View style={styles.tableHeaderRow}>
               <Text style={[styles.tableColTitle, styles.colNo]}>No</Text>
               <Text style={[styles.tableColTitle, styles.colName]}>Nama</Text>
@@ -158,7 +162,6 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
               <Text style={[styles.tableColTitle, styles.colTime]}>Waktu</Text>
             </View>
 
-            {/* Table Rows */}
             {filteredLogs.map((log, index) => {
               const formattedTime = log.timestamp
                 ? log.timestamp.replace(' WIB', '')
@@ -198,7 +201,6 @@ export const StudentListScreen: React.FC<StudentListScreenProps> = ({
         )}
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab="ScheduleList"
@@ -215,11 +217,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   sessionCard: {
-    padding: APP_SPACING.md,
+    padding: APP_SPACING.lg,
     borderRadius: APP_RADIUS.card,
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
@@ -233,7 +235,7 @@ const styles = StyleSheet.create({
   iconBox: {
     width: 36,
     height: 36,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: APP_COLORS.softBlue,
     alignItems: 'center',
     justifyContent: 'center',
@@ -243,12 +245,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   courseName: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 15,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 2,
   },
   sessionMeta: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
   },
@@ -258,17 +261,18 @@ const styles = StyleSheet.create({
     backgroundColor: APP_COLORS.white,
     borderWidth: 1,
     borderColor: APP_COLORS.border,
-    borderRadius: 10,
+    borderRadius: APP_RADIUS.md,
     paddingHorizontal: APP_SPACING.md,
-    height: 44,
+    height: 46,
     marginBottom: APP_SPACING.md,
   },
   searchInput: {
     flex: 1,
     height: '100%',
     marginLeft: APP_SPACING.sm,
-    fontSize: 13,
-    color: APP_COLORS.navyHeading,
+    fontFamily: APP_FONTS.regular,
+    fontSize: 14,
+    color: APP_COLORS.inkPrimary,
   },
   clearBtn: {
     padding: 4,
@@ -283,15 +287,15 @@ const styles = StyleSheet.create({
   tableHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: APP_COLORS.surfaceSubtle,
     borderBottomWidth: 1,
     borderBottomColor: APP_COLORS.border,
     paddingVertical: 10,
     paddingHorizontal: APP_SPACING.md,
   },
   tableColTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 12,
-    fontWeight: '700',
     color: APP_COLORS.textSecondary,
   },
   tableRow: {
@@ -300,10 +304,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: APP_SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: APP_COLORS.divider,
   },
   tableRowAlt: {
-    backgroundColor: '#FAFCFF',
+    backgroundColor: APP_COLORS.surfaceSubtle,
   },
   colNo: {
     width: 28,
@@ -314,7 +318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.sm,
   },
   colStatus: {
-    width: 72,
+    width: 78,
     alignItems: 'center',
   },
   colTime: {
@@ -322,26 +326,28 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   cellText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
   timeCellText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
-    fontWeight: '500',
   },
   studentNameText: {
+    fontFamily: APP_FONTS.semiBold,
     fontSize: 14,
-    fontWeight: '600',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
   },
   studentNimText: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
     color: APP_COLORS.textMuted,
     marginTop: 1,
   },
   pressed: {
-    opacity: 0.75,
+    opacity: 0.78,
   },
   loadingRow: {
     flexDirection: 'row',
@@ -350,16 +356,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   loadingRowText: {
+    fontFamily: APP_FONTS.medium,
     color: APP_COLORS.textSecondary,
     fontSize: 12,
   },
   loadingMessage: {
+    fontFamily: APP_FONTS.medium,
     color: APP_COLORS.textSecondary,
     fontSize: 12,
     marginBottom: 12,
   },
   errorMessage: {
-    color: APP_COLORS.error,
+    fontFamily: APP_FONTS.medium,
+    color: APP_COLORS.dangerText,
     fontSize: 12,
     marginBottom: 12,
   },

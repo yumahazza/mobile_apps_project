@@ -1,7 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { APP_COLORS } from '@/constants/theme';
+import { APP_COLORS, APP_FONTS } from '@/constants/theme';
 import { UserRole } from '@/data/users';
 
 export interface TabItem {
@@ -22,6 +29,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   activeTab,
   onTabChange,
 }) => {
+  const insets = useSafeAreaInsets();
+  const bottomClearance = Math.max(
+    insets.bottom,
+    Platform.OS === 'android' ? 24 : 12,
+  );
+
   const assistantTabs: TabItem[] = [
     {
       key: 'AssistantHome',
@@ -32,8 +45,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     {
       key: 'SessionRecap',
       label: 'Rekap',
-      iconName: 'stats-chart-outline',
-      activeIconName: 'stats-chart',
+      iconName: 'bar-chart-outline',
+      activeIconName: 'bar-chart',
     },
     {
       key: 'ScheduleList',
@@ -79,65 +92,107 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
   const tabs = role === 'assistant' ? assistantTabs : studentTabs;
 
   return (
-    <View style={styles.navBar}>
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.key;
-        const icon = isActive ? tab.activeIconName : tab.iconName;
-        const color = isActive ? APP_COLORS.primary : APP_COLORS.neutral500;
+    <View
+      style={[
+        styles.dockWrapper,
+        { paddingBottom: bottomClearance + 4 },
+      ]}>
+      <View style={styles.floatingDock}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.key;
+          const icon = isActive ? tab.activeIconName : tab.iconName;
 
-        return (
-          <Pressable
-            key={tab.key}
-            onPress={() => onTabChange(tab.key)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: isActive }}
-            accessibilityLabel={tab.label}
-            style={({ pressed }) => [styles.tabButton, pressed && styles.pressed]}>
-            <Ionicons name={icon} size={22} color={color} />
-            <Text
-              style={[
-                styles.tabLabel,
-                { color },
-                isActive && styles.activeTabLabel,
+          return (
+            <Pressable
+              key={tab.key}
+              onPress={() => onTabChange(tab.key)}
+              hitSlop={6}
+              android_ripple={{ color: 'transparent' }}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+              style={({ pressed }) => [
+                styles.tabButton,
+                pressed && styles.pressed,
               ]}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+              <View
+                style={[
+                  styles.iconCircle,
+                  isActive && styles.iconCircleActive,
+                ]}>
+                <Ionicons
+                  name={icon}
+                  size={20}
+                  color={
+                    isActive
+                      ? APP_COLORS.tetsuKon
+                      : APP_COLORS.navbarInactive
+                  }
+                />
+              </View>
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.tabLabel,
+                  isActive && styles.activeTabLabel,
+                ]}>
+                {tab.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  navBar: {
+  dockWrapper: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    backgroundColor: APP_COLORS.background,
+  },
+  floatingDock: {
     flexDirection: 'row',
-    height: 58,
-    backgroundColor: APP_COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: APP_COLORS.neutral200,
     alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    justifyContent: 'space-between',
+    backgroundColor: APP_COLORS.navbarDock,
+    borderRadius: 28,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
     minHeight: 48,
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  iconCircleActive: {
+    backgroundColor: APP_COLORS.navbarTosca,
   },
   tabLabel: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 11,
-    fontWeight: '500',
+    lineHeight: 14,
+    color: APP_COLORS.navbarInactive,
     marginTop: 3,
-    letterSpacing: 0.1,
   },
   activeTabLabel: {
-    fontWeight: '700',
+    fontFamily: APP_FONTS.bold,
+    color: APP_COLORS.navbarTosca,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.78,
   },
 });
 

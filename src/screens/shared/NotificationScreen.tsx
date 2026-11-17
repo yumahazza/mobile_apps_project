@@ -21,6 +21,7 @@ import { BottomNavigation } from '@/components/BottomNavigation';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -87,7 +88,7 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
           }));
         },
         () => {
-          // Abaikan error per jadwal agar notifikasi jadwal lain tetap tampil.
+          // Abaikan error per jadwal agar notifikasi lain tetap tampil.
         },
       ),
     );
@@ -108,11 +109,11 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
           .forEach((req) => {
             items.push({
               id: `leave-pending-${req.id}`,
-              iconName: 'document-text',
-              iconBgColor: '#FEF3C7',
-              iconColor: '#D97706',
+              iconName: 'document-text-outline',
+              iconBgColor: APP_COLORS.notOpenedSoft,
+              iconColor: APP_COLORS.notOpened,
               title: 'Pengajuan Izin Menunggu',
-              message: `${req.studentName} (${schedule.courseName}) • AI: ${req.aiClassification}`,
+              message: `${req.studentName} · ${schedule.courseName} (${schedule.className})`,
               meta: req.createdAt,
               onPress: () => {
                 setActiveScheduleId(schedule.id);
@@ -127,12 +128,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
         .forEach((s) => {
           items.push({
             id: `open-${s.id}`,
-            iconName: 'radio',
-            iconBgColor: '#DCFCE7',
-            iconColor: '#16A34A',
-            title: 'Sesi Sedang Berlangsung',
-            message: `${s.courseName} (${s.className}) sedang dibuka di ${s.room}.`,
-            meta: `${s.date} • ${s.time}`,
+            iconName: 'radio-outline',
+            iconBgColor: APP_COLORS.openedSoft,
+            iconColor: APP_COLORS.opened,
+            title: 'Sesi Sedang Dibuka',
+            message: `${s.courseName} (${s.className}) · ${s.room}`,
+            meta: `${s.date} · ${s.time}`,
             onPress: () => {
               setActiveScheduleId(s.id);
               navigation.navigate('SessionControl', { scheduleId: s.id });
@@ -145,12 +146,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
         .forEach((s) => {
           items.push({
             id: `upcoming-${s.id}`,
-            iconName: 'calendar',
+            iconName: 'calendar-outline',
             iconBgColor: APP_COLORS.softBlue,
             iconColor: APP_COLORS.primary,
             title: 'Jadwal Menunggu Dibuka',
-            message: `${s.courseName} (${s.className}) di ${s.room}.`,
-            meta: `${s.date} • ${s.time}`,
+            message: `${s.courseName} (${s.className}) · ${s.room}`,
+            meta: `${s.date} · ${s.time}`,
             onPress: () => {
               setActiveScheduleId(s.id);
               navigation.navigate('SessionControl', { scheduleId: s.id });
@@ -164,12 +165,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
         .forEach((s) => {
           items.push({
             id: `recap-${s.id}`,
-            iconName: 'stats-chart',
-            iconBgColor: '#F1F5F9',
-            iconColor: '#475569',
-            title: 'Rekap & Sentimen Sesi Tersedia',
-            message: `${s.courseName} (${s.className}) telah selesai.`,
-            meta: `${s.date} • ${s.time}`,
+            iconName: 'stats-chart-outline',
+            iconBgColor: APP_COLORS.finishedSoft,
+            iconColor: APP_COLORS.finished,
+            title: 'Rekap & Ulasan Tersedia',
+            message: `${s.courseName} (${s.className})`,
+            meta: `${s.date} · ${s.time}`,
             onPress: () => {
               setActiveScheduleId(s.id);
               navigation.navigate('SessionRecap', { scheduleId: s.id });
@@ -187,12 +188,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       .forEach((s) => {
         items.push({
           id: `stu-open-${s.id}`,
-          iconName: 'notifications',
-          iconBgColor: '#DCFCE7',
-          iconColor: '#16A34A',
-          title: 'Presensi Sedang Dibuka',
-          message: `${s.courseName} (${s.className}) di ${s.room} membuka presensi sekarang.`,
-          meta: `${s.date} • ${s.time}`,
+          iconName: 'notifications-outline',
+          iconBgColor: APP_COLORS.openedSoft,
+          iconColor: APP_COLORS.opened,
+          title: 'Presensi Dibuka',
+          message: `${s.courseName} (${s.className}) · ${s.room}`,
+          meta: `${s.date} · ${s.time}`,
           onPress: () => {
             setActiveScheduleId(s.id);
             navigation.navigate('SessionDetail', { scheduleId: s.id });
@@ -201,31 +202,36 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       });
 
     studentLeaves.forEach((req) => {
+      const matchedSchedule = schedules.find((s) => s.id === req.scheduleId);
+      const courseLabel =
+        matchedSchedule?.courseName || req.courseName || 'Praktikum';
+      const classLabel = matchedSchedule?.className || req.className || '';
       const isApproved = req.status === 'DITERIMA';
       const isRejected = req.status === 'DITOLAK';
+
       items.push({
         id: `stu-leave-${req.id}`,
         iconName: isApproved
-          ? 'checkmark-circle'
+          ? 'checkmark-circle-outline'
           : isRejected
-          ? 'close-circle'
-          : 'time',
+          ? 'close-circle-outline'
+          : 'time-outline',
         iconBgColor: isApproved
-          ? '#DCFCE7'
+          ? APP_COLORS.openedSoft
           : isRejected
-          ? '#FEE2E2'
-          : '#FEF3C7',
+          ? APP_COLORS.dangerSoft
+          : APP_COLORS.notOpenedSoft,
         iconColor: isApproved
-          ? '#16A34A'
+          ? APP_COLORS.opened
           : isRejected
-          ? '#DC2626'
-          : '#D97706',
+          ? APP_COLORS.dangerText
+          : APP_COLORS.notOpened,
         title: isApproved
-          ? 'Pengajuan Izin Diterima'
+          ? 'Izin Diterima'
           : isRejected
-          ? 'Pengajuan Izin Ditolak'
-          : 'Pengajuan Izin Menunggu',
-        message: `${req.courseName || 'Praktikum'} • AI: ${req.aiClassification}`,
+          ? 'Izin Ditolak'
+          : 'Izin Menunggu Review',
+        message: `${courseLabel}${classLabel ? ` · ${classLabel}` : ''}`,
         meta: req.reviewedAt || req.createdAt,
         onPress: () => {
           setActiveScheduleId(req.scheduleId);
@@ -240,12 +246,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       .forEach((s) => {
         items.push({
           id: `stu-finished-${s.id}`,
-          iconName: 'chatbubbles',
+          iconName: 'chatbubbles-outline',
           iconBgColor: APP_COLORS.softBlue,
           iconColor: APP_COLORS.primary,
-          title: 'Sesi Selesai — Pesan & Kesan',
-          message: `${s.courseName} (${s.className}) telah selesai. Anda dapat mengisi ulasan.`,
-          meta: `${s.date} • ${s.time}`,
+          title: 'Sesi Selesai · Kirim Ulasan',
+          message: `${s.courseName} (${s.className})`,
+          meta: `${s.date} · ${s.time}`,
           onPress: () => {
             setActiveScheduleId(s.id);
             navigation.navigate('SessionDetail', { scheduleId: s.id });
@@ -257,11 +263,14 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       const matchedSchedule = schedules.find((s) => s.id === rec.scheduleId);
       items.push({
         id: `stu-att-${rec.id}`,
-        iconName: rec.status === 'Izin' ? 'document-text' : 'shield-checkmark',
-        iconBgColor: rec.status === 'Izin' ? '#FEF3C7' : '#DCFCE7',
-        iconColor: rec.status === 'Izin' ? '#D97706' : '#16A34A',
-        title: `Kehadiran Tercatat (${rec.status})`,
-        message: `${matchedSchedule?.courseName || 'Praktikum'} • ${rec.timestamp}`,
+        iconName:
+          rec.status === 'Izin' ? 'document-text-outline' : 'checkmark-circle-outline',
+        iconBgColor:
+          rec.status === 'Izin' ? APP_COLORS.notOpenedSoft : APP_COLORS.openedSoft,
+        iconColor:
+          rec.status === 'Izin' ? APP_COLORS.notOpened : APP_COLORS.opened,
+        title: `Kehadiran: ${rec.status}`,
+        message: `${matchedSchedule?.courseName || 'Praktikum'} · ${rec.timestamp}`,
         meta: rec.date,
         onPress: () => {
           navigation.navigate('AttendanceDetail', {
@@ -277,12 +286,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
       .forEach((s) => {
         items.push({
           id: `stu-upcoming-${s.id}`,
-          iconName: 'calendar',
+          iconName: 'calendar-outline',
           iconBgColor: APP_COLORS.softBlue,
           iconColor: APP_COLORS.primary,
-          title: 'Jadwal Praktikum Terdaftar',
-          message: `${s.courseName} (${s.className}) di ${s.room}.`,
-          meta: `${s.date} • ${s.time}`,
+          title: 'Jadwal Terdaftar',
+          message: `${s.courseName} (${s.className}) · ${s.room}`,
+          meta: `${s.date} · ${s.time}`,
           onPress: () => {
             setActiveScheduleId(s.id);
             navigation.navigate('SessionDetail', { scheduleId: s.id });
@@ -306,7 +315,6 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      {/* Top Academic Blue Header */}
       <AppHeader
         title="Notifikasi"
         onBack={() => navigation.goBack()}
@@ -319,7 +327,7 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
         {isLoading ? (
           <View style={styles.stateContainer}>
             <ActivityIndicator size="large" color={APP_COLORS.primary} />
-            <Text style={styles.stateText}>Memuat aktivitas terbaru...</Text>
+            <Text style={styles.stateText}>Memuat aktivitas...</Text>
           </View>
         ) : schedulesError ? (
           <EmptyState
@@ -331,7 +339,7 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
           <EmptyState
             icon="notifications-off-outline"
             title="Belum Ada Aktivitas"
-            description="Notifikasi sesi praktikum, presensi, dan status pengajuan izin secara real-time akan tampil di sini."
+            description="Pembaruan sesi, presensi, dan izin akan tampil di sini."
           />
         ) : (
           <View style={styles.listContainer}>
@@ -348,7 +356,7 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
                     ]}>
                     <Ionicons
                       name={item.iconName}
-                      size={20}
+                      size={19}
                       color={item.iconColor}
                     />
                   </View>
@@ -362,7 +370,7 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
                   <Ionicons
                     name="chevron-forward"
                     size={16}
-                    color={APP_COLORS.neutral400}
+                    color={APP_COLORS.textMuted}
                   />
                 </View>
               </Card>
@@ -371,7 +379,6 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
         )}
       </ScrollView>
 
-      {/* Bottom Navigation */}
       <BottomNavigation
         role={activeRole}
         activeTab={activeRole === 'assistant' ? 'AssistantHome' : 'StudentHome'}
@@ -388,8 +395,8 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: APP_SPACING.lg,
-    paddingTop: APP_SPACING.md,
-    paddingBottom: APP_SPACING.xl,
+    paddingTop: APP_SPACING.xs,
+    paddingBottom: APP_SPACING.xxl,
   },
   stateContainer: {
     alignItems: 'center',
@@ -398,6 +405,7 @@ const styles = StyleSheet.create({
     gap: APP_SPACING.sm,
   },
   stateText: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 13,
     color: APP_COLORS.textSecondary,
   },
@@ -416,9 +424,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: APP_SPACING.md,
@@ -428,18 +436,20 @@ const styles = StyleSheet.create({
     paddingRight: APP_SPACING.sm,
   },
   notifTitle: {
+    fontFamily: APP_FONTS.bold,
     fontSize: 14,
-    fontWeight: '700',
-    color: APP_COLORS.navyHeading,
+    color: APP_COLORS.inkPrimary,
     marginBottom: 2,
   },
   notifMessage: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
     color: APP_COLORS.textSecondary,
-    lineHeight: 16,
-    marginBottom: 4,
+    lineHeight: 17,
+    marginBottom: 3,
   },
   notifTime: {
+    fontFamily: APP_FONTS.regular,
     fontSize: 11,
     color: APP_COLORS.textMuted,
   },

@@ -1,7 +1,5 @@
-
 /**
  * Header identitas pengguna berdasarkan akun Firebase yang aktif.
- * Role hanya ditampilkan, bukan digunakan untuk berpindah akun.
  */
 
 import React from 'react';
@@ -14,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import {
   APP_COLORS,
+  APP_FONTS,
   APP_RADIUS,
   APP_SPACING,
 } from '@/constants/theme';
@@ -45,7 +44,7 @@ export const HeaderRolePicker: React.FC<HeaderRolePickerProps> = ({
             ? 'shield-checkmark-outline'
             : 'school-outline'
         }
-        size={16}
+        size={14}
         color={
           assistant
             ? APP_COLORS.primary
@@ -91,62 +90,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: APP_SPACING.xl,
+    paddingHorizontal: APP_SPACING.lg,
     paddingVertical: APP_SPACING.md,
     gap: APP_SPACING.md,
-    backgroundColor: APP_COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: APP_COLORS.neutral200,
+    backgroundColor: APP_COLORS.background,
   },
-
   introduction: {
     flex: 1,
     minWidth: 0,
   },
-
   greeting: {
-    fontSize: 17,
-    lineHeight: 23,
-    fontWeight: '700',
-    color: APP_COLORS.neutral950,
+    fontFamily: APP_FONTS.bold,
+    fontSize: 18,
+    lineHeight: 24,
+    color: APP_COLORS.inkPrimary,
   },
-
   identity: {
+    fontFamily: APP_FONTS.medium,
     fontSize: 12,
-    lineHeight: 17,
-    color: APP_COLORS.neutral500,
+    lineHeight: 16,
+    color: APP_COLORS.textSecondary,
     marginTop: 2,
   },
-
   accountBadge: {
-    minHeight: 44,
+    minHeight: 36,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: APP_SPACING.md,
     borderWidth: 1,
     borderRadius: APP_RADIUS.pill,
   },
-
   accountAssistant: {
-    backgroundColor: APP_COLORS.primary50,
-    borderColor: APP_COLORS.primary100,
+    backgroundColor: APP_COLORS.softBlue,
+    borderColor: APP_COLORS.infoBorder,
   },
-
   accountStudent: {
     backgroundColor: APP_COLORS.openedSoft,
     borderColor: '#BBF7D0',
   },
-
   roleText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
   },
-
   textAssistant: {
     color: APP_COLORS.primary,
   },
-
   textStudent: {
     color: APP_COLORS.opened,
   },
