@@ -14,6 +14,39 @@ export type SentimentLabel =
   | 'Netral'
   | 'Tidak Terklasifikasi';
 
+export type AttendanceLocationErrorCode =
+  | 'PERMISSION_DENIED'
+  | 'SERVICES_DISABLED'
+  | 'LOCATION_UNAVAILABLE'
+  | 'TIMEOUT'
+  | 'STALE_LOCATION'
+  | 'INVALID_COORDINATES'
+  | 'UNRELIABLE_ACCURACY'
+  | 'INVALID_RADIUS'
+  | 'OUTSIDE_RADIUS'
+  | 'LAB_NOT_FOUND'
+  | 'AMBIGUOUS_LAB'
+  | 'UNKNOWN_ERROR';
+
+export interface AttendanceLocationCoordinates {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  timestamp: number;
+}
+
+export interface AttendanceLocationValidation {
+  isWithinRadius: boolean;
+  distanceMeters: number;
+  radiusMeters: number;
+  laboratoryId: string;
+  laboratoryName: string;
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  validatedAt: string;
+}
+
 export interface AttendanceFirestoreDoc {
   scheduleId: string;
   studentId: string; // Firebase Auth UID

@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import {
-  submitPracticumAttendance,
   subscribeToStudentAttendanceForSchedule,
 } from '@/services/attendanceService';
 import type { AttendanceRecordItem } from '@/types/attendance';
@@ -60,7 +59,6 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     key: string;
     record: AttendanceRecordItem | null;
   }>({ key: '', record: null });
-  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState<boolean>(false);
 
   useEffect(() => {
     if (!attendanceSubKey || !currentSchedule?.id || !activeUser?.id) {
@@ -105,34 +103,11 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
     .map((part) => part[0]?.toUpperCase())
     .join('');
 
-  const handleAttendancePress = async () => {
+  const handleAttendancePress = () => {
     if (!currentSchedule) return;
-    try {
-      setIsSubmittingAttendance(true);
-      const res = await submitPracticumAttendance({
-        scheduleId: currentSchedule.id,
-        studentId: activeUser.id,
-        studentName: activeUser.name,
-        nim: activeUser.nim,
-      });
-      setFeedbackModal({
-        visible: true,
-        success: true,
-        message: res.message,
-        timestamp: res.timestamp,
-      });
-    } catch (error) {
-      setFeedbackModal({
-        visible: true,
-        success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : 'Presensi gagal dicatat.',
-      });
-    } finally {
-      setIsSubmittingAttendance(false);
-    }
+    navigation.navigate('StudentAttendance', {
+      scheduleId: currentSchedule.id,
+    });
   };
 
   const renderTopBar = () => (
@@ -338,20 +313,15 @@ export const StudentHomeScreen: React.FC<StudentHomeScreenProps> = ({
             </View>
           ) : isSessionOpen ? (
             <CustomButton
-              title={isSubmittingAttendance ? 'Mencatat...' : 'Presensi Sekarang'}
+              title="Presensi Sekarang"
               variant="accent"
               size="md"
-              disabled={isSubmittingAttendance}
               leftIcon={
-                isSubmittingAttendance ? (
-                  <ActivityIndicator size="small" color={APP_COLORS.tetsuKon} />
-                ) : (
-                  <Ionicons
-                    name="checkmark-circle-outline"
-                    size={18}
-                    color={APP_COLORS.tetsuKon}
-                  />
-                )
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color={APP_COLORS.tetsuKon}
+                />
               }
               onPress={handleAttendancePress}
             />
