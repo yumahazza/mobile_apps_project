@@ -55,6 +55,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       activeIconName: 'calendar',
     },
     {
+      key: 'LaboratoryMap',
+      label: 'Maps',
+      iconName: 'map-outline',
+      activeIconName: 'map',
+    },
+    {
       key: 'Profile',
       label: 'Profil',
       iconName: 'person-outline',
@@ -80,6 +86,12 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       label: 'Riwayat',
       iconName: 'time-outline',
       activeIconName: 'time',
+    },
+    {
+      key: 'LaboratoryMap',
+      label: 'Maps',
+      iconName: 'map-outline',
+      activeIconName: 'map',
     },
     {
       key: 'Profile',

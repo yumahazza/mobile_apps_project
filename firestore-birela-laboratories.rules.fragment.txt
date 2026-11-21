@@ -1,0 +1,6 @@
+// BIRELA — read access for the interactive laboratory map.
+// Merge this match block into the main firestore.rules file.
+// Yuma remains responsible for the laboratory write rules.
+match /laboratories/{laboratoryId} {
+  allow read: if signedIn() && (isAssistant() || isStudent());
+}
