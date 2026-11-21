@@ -148,9 +148,11 @@ function createFirebaseSimulator() {
     collection: (_db, name) => ({ __type: 'collection', name }),
     doc: (colOrDb, colOrId, maybeId) => {
       if (typeof colOrDb === 'object' && colOrDb.__type === 'collection') {
-        return { __type: 'doc', path: `${colOrDb.name}/${colOrId}`, id: colOrId };
+        const resolvedId = colOrId || `doc_${autoIdCounter++}`;
+        return { __type: 'doc', path: `${colOrDb.name}/${resolvedId}`, id: resolvedId };
       }
-      return { __type: 'doc', path: `${colOrId}/${maybeId}`, id: maybeId };
+      const resolvedId = maybeId || `doc_${autoIdCounter++}`;
+      return { __type: 'doc', path: `${colOrId}/${resolvedId}`, id: resolvedId };
     },
     query: (colRef, ...constraints) => ({
       __type: 'query',
@@ -233,7 +235,12 @@ function createFirebaseSimulator() {
     __store: store,
   };
 
-  return { authModule, firestoreModule };
+  const reactNativeModule = {
+    Platform: { OS: 'android', select: obj => obj.android ?? obj.default },
+    Linking: { openSettings: async () => true },
+  };
+
+  return { authModule, firestoreModule, reactNativeModule };
 }
 
 // ============================================================================
@@ -283,6 +290,7 @@ function installTsLoader(sim) {
     const localRequire = request => {
       if (request === '@react-native-firebase/auth') return sim.authModule;
       if (request === '@react-native-firebase/firestore') return sim.firestoreModule;
+      if (request === 'react-native') return sim.reactNativeModule;
       if (request.startsWith('@/')) {
         const target = resolveTsFile(path.join(SRC_DIR, request.slice(2)));
         if (!target) throw new Error(`Cannot resolve alias '${request}' from ${canonical}`);
@@ -314,6 +322,7 @@ function installTsLoader(sim) {
   Module._load = function (request, parent, isMain) {
     if (request === '@react-native-firebase/auth') return sim.authModule;
     if (request === '@react-native-firebase/firestore') return sim.firestoreModule;
+    if (request === 'react-native') return sim.reactNativeModule;
     return originalLoad.call(this, request, parent, isMain);
   };
 
@@ -349,9 +358,10 @@ async function main() {
   }
 
   try {
-    console.log('=== 1. MENJALANKAN UNIT TEST TYPESCRIPT PRODUKSI (FRITZ & LINTANG) ===\n');
+    console.log('=== 1. MENJALANKAN UNIT TEST TYPESCRIPT PRODUKSI (FRITZ, LINTANG & YUMA) ===\n');
     const { runFritzTests } = loadTsModule(path.join(SRC_DIR, 'tests/fritzFeatures.test.ts'));
     const { runLintangTests } = loadTsModule(path.join(SRC_DIR, 'tests/lintangFeatures.test.ts'));
+    const { runYumaTests } = loadTsModule(path.join(SRC_DIR, 'tests/yumaFeatures.test.ts'));
 
     const fritzRes = await runFritzTests();
     assert(
@@ -363,6 +373,12 @@ async function main() {
     assert(
       `src/tests/lintangFeatures.test.ts (${lintangRes.passed} passed, ${lintangRes.failed} failed)`,
       lintangRes.failed === 0 && lintangRes.passed > 0,
+    );
+
+    const yumaRes = await runYumaTests();
+    assert(
+      `src/tests/yumaFeatures.test.ts (${yumaRes.passed} passed, ${yumaRes.failed} failed)`,
+      yumaRes.failed === 0 && yumaRes.passed > 0,
     );
 
     console.log('\n=== 2. SIMULASI END-TO-END (UAT) LINTAS MODUL PRODUKSI ===\n');
@@ -798,7 +814,104 @@ async function main() {
     unsubAttRecap();
     unsubFb();
 
-    // --- Skenario 6: Verifikasi Kontrak firestore.rules ---
+    // --- Skenario 6: Yuma Sprint 3 (Manajemen Laboratorium, RBAC & Relasi Jadwal Opsi A) ---
+    const laboratoryService = loadTsModule(path.join(SRC_DIR, 'services/laboratoryService.ts'));
+
+    let liveLaboratories = [];
+    const unsubLabs = laboratoryService.subscribeToLaboratories(
+      list => { liveLaboratories = list; },
+      err => assert('Listener laboratories error', false, err),
+    );
+
+    await authService.signInWithEmail('budi@univ.ac.id', 'secret123');
+    await expectThrows(
+      'UAT-Lab-1: Praktikan ditolak membuat data laboratorium',
+      () =>
+        laboratoryService.createLaboratory({
+          name: 'Lab Ilegal',
+          building: 'Gedung A',
+          floor: '1',
+          latitude: -7.77,
+          longitude: 110.37,
+          radius: 50,
+        }),
+      'Akses ditolak',
+    );
+
+    await authService.signInWithEmail('asisten@univ.ac.id', 'secret123');
+    const lab1Id = await laboratoryService.createLaboratory(
+      {
+        name: 'Lab Pemrograman Lanjut',
+        building: 'Gedung Ilmu Komputer',
+        floor: '3',
+        latitude: -7.770615,
+        longitude: 110.377812,
+        radius: 60,
+      },
+      { uid: assistantUid, role: 'assistant' },
+    );
+    assert(
+      'UAT-Lab-2: Asisten membuat lab dan listener real-time langsung menerima data',
+      Boolean(lab1Id) &&
+        liveLaboratories.length === 1 &&
+        liveLaboratories[0].id === lab1Id &&
+        liveLaboratories[0].radius === 60,
+    );
+
+    await laboratoryService.updateLaboratory(
+      lab1Id,
+      {
+        name: 'Lab Pemrograman Lanjut',
+        building: 'Gedung Ilmu Komputer',
+        floor: '3',
+        latitude: -7.770615,
+        longitude: 110.377812,
+        radius: 90,
+      },
+      { uid: assistantUid, role: 'assistant' },
+    );
+    assert(
+      'UAT-Lab-3: Pembaruan radius lab tersinkronisasi real-time',
+      liveLaboratories[0]?.radius === 90,
+    );
+
+    const labScheduleId = await scheduleService.createPracticumSchedule(
+      {
+        courseName: 'Rekayasa Perangkat Lunak',
+        className: 'Kelas C',
+        room: 'Lab Pemrograman Lanjut',
+        laboratoryId: lab1Id,
+        date: '2026-11-22',
+        time: '09:00 - 11:00',
+        enrolledStudents: [student1Uid],
+      },
+      { uid: assistantUid, name: 'Asisten Hana' },
+    );
+    await sessionControl.openPracticumSession(labScheduleId, assistantUid);
+
+    await expectThrows(
+      'UAT-Lab-4: Penolakan hapus laboratorium saat ada jadwal berstatus DIBUKA',
+      () =>
+        laboratoryService.deleteLaboratory(lab1Id, {
+          uid: assistantUid,
+          role: 'assistant',
+        }),
+      'DIBUKA',
+    );
+
+    await sessionControl.closePracticumSession(labScheduleId, assistantUid);
+    await laboratoryService.deleteLaboratory(lab1Id, {
+      uid: assistantUid,
+      role: 'assistant',
+    });
+    assert(
+      'UAT-Lab-5: Laboratorium dapat dihapus setelah sesi terkait ditutup menjadi SELESAI',
+      liveLaboratories.length === 0,
+    );
+
+    unsubLabs();
+
+    // --- Skenario 7: Verifikasi Kontrak firestore.rules ---
     console.log('\n=== 3. VERIFIKASI KONTRAK FIRESTORE SECURITY RULES ===\n');
     const rulesContent = fs.readFileSync(path.join(ROOT_DIR, 'firestore.rules'), 'utf8');
     assert(
@@ -816,6 +929,17 @@ async function main() {
     assert(
       'Rules-4: leave_requests update mensyaratkan transaksi atomik attendances (getAfter)',
       rulesContent.includes('getAfter(') && rulesContent.includes("status == 'Izin'"),
+    );
+    assert(
+      'Rules-5: laboratories membatasi write khusus asisten dan read untuk signedIn',
+      rulesContent.includes('match /laboratories/{laboratoryId}') &&
+        rulesContent.includes('allow read: if signedIn();') &&
+        rulesContent.includes('validLaboratoryFields(request.resource.data)'),
+    );
+    assert(
+      'Rules-6: schedules mengizinkan field opsional laboratoryId (Opsi A)',
+      rulesContent.includes("'laboratoryId'") &&
+        rulesContent.includes('validOptionalLaboratoryId(request.resource.data)'),
     );
   } finally {
     restore();

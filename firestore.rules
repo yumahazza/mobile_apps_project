@@ -148,6 +148,84 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    function validOptionalLaboratoryId(data) {
+      return !('laboratoryId' in data)
+        || data.laboratoryId == null
+        || (data.laboratoryId is string && data.laboratoryId.size() > 0);
+    }
+
+    // LABORATORIES
+
+    function validLaboratoryFields(data) {
+      return data.name is string
+        && data.name.size() >= 2
+        && data.name.size() <= 100
+        && data.building is string
+        && data.building.size() >= 1
+        && data.building.size() <= 100
+        && (
+          (data.floor is string && data.floor.size() >= 1 && data.floor.size() <= 50)
+          || data.floor is int
+          || data.floor is float
+        )
+        && (data.latitude is int || data.latitude is float)
+        && data.latitude >= -90
+        && data.latitude <= 90
+        && (data.longitude is int || data.longitude is float)
+        && data.longitude >= -180
+        && data.longitude <= 180
+        && (data.radius is int || data.radius is float)
+        && data.radius >= 5
+        && data.radius <= 5000;
+    }
+
+    match /laboratories/{laboratoryId} {
+      allow read: if signedIn();
+
+      allow create: if isAssistant()
+        && request.resource.data.keys().hasAll([
+          'id',
+          'name',
+          'building',
+          'floor',
+          'latitude',
+          'longitude',
+          'radius',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'id',
+          'name',
+          'building',
+          'floor',
+          'latitude',
+          'longitude',
+          'radius',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.id == laboratoryId
+        && validLaboratoryFields(request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+
+      allow update: if isAssistant()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'building',
+          'floor',
+          'latitude',
+          'longitude',
+          'radius',
+          'updatedAt'
+        ])
+        && validLaboratoryFields(request.resource.data)
+        && request.resource.data.updatedAt == request.time;
+
+      allow delete: if isAssistant();
+    }
+
     // SCHEDULES
 
     match /schedules/{scheduleId} {
@@ -165,7 +243,8 @@ service cloud.firestore {
         && request.resource.data.status == 'BELUM_DIBUKA'
         && request.resource.data.enrolledStudents is list
         && request.resource.data.totalStudents
-          == request.resource.data.enrolledStudents.size();
+          == request.resource.data.enrolledStudents.size()
+        && validOptionalLaboratoryId(request.resource.data);
 
       allow update: if isAssistant()
         && resource.data.assistantId == request.auth.uid
@@ -176,6 +255,7 @@ service cloud.firestore {
             'courseName',
             'className',
             'room',
+            'laboratoryId',
             'date',
             'time',
             'enrolledStudents',
@@ -183,6 +263,7 @@ service cloud.firestore {
             'status',
             'updatedAt'
           ])
+        && validOptionalLaboratoryId(request.resource.data)
         && request.resource.data.enrolledStudents is list
         && request.resource.data.totalStudents
           == request.resource.data.enrolledStudents.size()

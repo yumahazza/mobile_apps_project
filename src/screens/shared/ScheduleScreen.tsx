@@ -21,6 +21,9 @@ import { EmptyState } from '@/components/EmptyState';
 import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
+import { useLaboratories } from '@/hooks/useLaboratories';
+import { resolveLaboratoryForSchedule } from '@/services/laboratoryService';
+import type { Laboratory } from '@/types/laboratory';
 import {
   createPracticumSchedule,
   deletePracticumSchedule,
@@ -45,6 +48,7 @@ const emptyForm = (): ScheduleInput => ({
   courseName: '',
   className: '',
   room: '',
+  laboratoryId: null,
   date: new Date().toISOString().slice(0, 10),
   time: '08:00 - 10:00',
   enrolledStudents: [],
@@ -57,6 +61,9 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
     activeRole,
   );
   const isAssistant = activeRole === 'assistant';
+  const { laboratories, loading: loadingLaboratories } = useLaboratories(
+    isAssistant ? activeUser.id : undefined,
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSchedule, setEditingSchedule] = useState<PracticumSchedule | null>(null);
@@ -98,10 +105,12 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
 
   const openEdit = (schedule: PracticumSchedule) => {
     setEditingSchedule(schedule);
+    const matchedLab = resolveLaboratoryForSchedule(schedule, laboratories);
     setForm({
       courseName: schedule.courseName,
       className: schedule.className,
       room: schedule.room,
+      laboratoryId: schedule.laboratoryId ?? matchedLab?.id ?? null,
       date: schedule.date,
       time: schedule.time,
       enrolledStudents: [...schedule.enrolledStudents],
@@ -111,7 +120,31 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const updateField = (field: keyof ScheduleInput, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      if (field !== 'room') {
+        return { ...prev, [field]: value };
+      }
+      const selectedLab = laboratories.find((lab) => lab.id === prev.laboratoryId);
+      const keepLabId =
+        selectedLab &&
+        selectedLab.name.trim().toLowerCase() === value.trim().toLowerCase()
+          ? prev.laboratoryId
+          : null;
+      return { ...prev, room: value, laboratoryId: keepLabId };
+    });
+  };
+
+  const selectLaboratory = (lab: Laboratory) => {
+    setForm((prev) => {
+      if (prev.laboratoryId === lab.id) {
+        return { ...prev, laboratoryId: null };
+      }
+      return {
+        ...prev,
+        laboratoryId: lab.id,
+        room: lab.name,
+      };
+    });
   };
 
   const toggleStudent = (uid: string) => {
@@ -189,14 +222,34 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
         <View style={styles.headingRow}>
           <Text style={styles.heading}>Semua Sesi</Text>
           {isAssistant && (
-            <CustomButton
-              title="Jadwal Baru"
-              variant="primary"
-              size="sm"
-              fullWidth={false}
-              leftIcon={<Ionicons name="add" size={16} color={APP_COLORS.white} />}
-              onPress={openCreate}
-            />
+            <View style={styles.headingActions}>
+              <CustomButton
+                title="Kelola Lab"
+                variant="secondary"
+                size="sm"
+                fullWidth={false}
+                leftIcon={
+                  <Ionicons
+                    name="location-outline"
+                    size={15}
+                    color={APP_COLORS.tetsuKon}
+                  />
+                }
+                onPress={() =>
+                  navigation.navigate('LaboratoryManagement', {
+                    fromTab: 'ScheduleList',
+                  })
+                }
+              />
+              <CustomButton
+                title="Jadwal Baru"
+                variant="primary"
+                size="sm"
+                fullWidth={false}
+                leftIcon={<Ionicons name="add" size={16} color={APP_COLORS.white} />}
+                onPress={openCreate}
+              />
+            </View>
           )}
         </View>
 
@@ -338,6 +391,66 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
                 onChangeText={(value) => updateField('className', value)}
                 placeholder="Contoh: Kelas A"
               />
+              <View style={styles.fieldGroup}>
+                <View style={styles.labPickerHeader}>
+                  <Text style={styles.fieldLabel}>
+                    Pilih Laboratorium (Opsional)
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setModalVisible(false);
+                      navigation.navigate('LaboratoryManagement', {
+                        fromTab: 'ScheduleList',
+                      });
+                    }}
+                    hitSlop={6}>
+                    <Text style={styles.manageLabLink}>Kelola Lab</Text>
+                  </Pressable>
+                </View>
+
+                {loadingLaboratories ? (
+                  <ActivityIndicator color={APP_COLORS.primary} />
+                ) : laboratories.length === 0 ? (
+                  <Text style={styles.labPickerEmpty}>
+                    Belum ada laboratorium tersimpan. Anda tetap bisa mengisi nama ruangan secara manual di bawah.
+                  </Text>
+                ) : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.labChipsRow}>
+                    {laboratories.map((lab) => {
+                      const isSelected = form.laboratoryId === lab.id;
+                      return (
+                        <Pressable
+                          key={lab.id}
+                          onPress={() => selectLaboratory(lab)}
+                          style={[
+                            styles.labChip,
+                            isSelected && styles.labChipSelected,
+                          ]}>
+                          <Text
+                            style={[
+                              styles.labChipTitle,
+                              isSelected && styles.labChipTitleSelected,
+                            ]}
+                            numberOfLines={1}>
+                            {lab.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.labChipMeta,
+                              isSelected && styles.labChipMetaSelected,
+                            ]}
+                            numberOfLines={1}>
+                            {lab.building} · {lab.radius} m
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                )}
+              </View>
               <FormField
                 label="Ruangan"
                 value={form.room}
@@ -474,12 +587,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: APP_SPACING.sm,
     marginBottom: APP_SPACING.md,
+  },
+  headingActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: APP_SPACING.sm,
   },
   heading: {
     fontFamily: APP_FONTS.bold,
     fontSize: 17,
     color: APP_COLORS.inkPrimary,
+    flex: 1,
   },
   list: {
     gap: APP_SPACING.sm,
@@ -683,6 +803,59 @@ const styles = StyleSheet.create({
     color: APP_COLORS.textSecondary,
     marginTop: 6,
     marginBottom: 10,
+  },
+  labPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  manageLabLink: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.primary,
+  },
+  labPickerEmpty: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 12,
+    color: APP_COLORS.textSecondary,
+    lineHeight: 17,
+  },
+  labChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingBottom: 2,
+  },
+  labChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: APP_RADIUS.md,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    minWidth: 140,
+    maxWidth: 200,
+  },
+  labChipSelected: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  labChipTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.inkPrimary,
+  },
+  labChipTitleSelected: {
+    color: APP_COLORS.white,
+  },
+  labChipMeta: {
+    fontFamily: APP_FONTS.medium,
+    fontSize: 11,
+    color: APP_COLORS.textSecondary,
+    marginTop: 2,
+  },
+  labChipMetaSelected: {
+    color: APP_COLORS.nordicBreeze,
   },
   saveButton: {
     marginTop: 6,

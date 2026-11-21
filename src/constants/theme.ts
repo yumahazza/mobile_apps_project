@@ -70,7 +70,7 @@ export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
 
 export const APP_COLORS = {
-  // Core Palette (assets/palette/image 12.png — MP067)
+  // Core Palette 
   cloudDancer: '#F0EEE9',
   tetsuKon: '#17184B',
   intergalactic: '#273287',
