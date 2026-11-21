@@ -35,4 +35,5 @@ export type StudentScreenName =
   | 'SessionDetail'
   | 'AttendanceDetail'
   | 'Notifications'
-  | 'LaboratoryMap';
+  | 'LaboratoryMap'
+  | 'StudentAttendance';

@@ -9,6 +9,7 @@ import { AttendanceDetailScreen } from '@/screens/shared/AttendanceDetailScreen'
 import { ProfileScreen } from '@/screens/shared/ProfileScreen';
 import { NotificationScreen } from '@/screens/shared/NotificationScreen';
 import { LaboratoryMapScreen } from '@/screens/shared/LaboratoryMapScreen';
+import { StudentAttendanceScreen } from '@/screens/student/StudentAttendanceScreen';
 import { NavigationProp, StudentScreenName } from '@/navigation/navigationTypes';
 
 interface ScreenEntry {
@@ -84,6 +85,9 @@ export const StudentStack: React.FC = () => {
       )}
       {currentScreen === 'LeaveRequest' && (
         <LeaveRequestScreen navigation={navigation} />
+      )}
+      {currentScreen === 'StudentAttendance' && (
+        <StudentAttendanceScreen navigation={navigation} />
       )}
     </View>
   );

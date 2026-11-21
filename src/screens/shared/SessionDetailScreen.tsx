@@ -13,7 +13,6 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useRealtimeAttendance } from '@/hooks/useRealtimeAttendance';
 import {
-  submitPracticumAttendance,
   subscribeToStudentAttendanceForSchedule,
 } from '@/services/attendanceService';
 import type { AttendanceRecordItem } from '@/types/attendance';
@@ -65,7 +64,6 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
     key: string;
     record: AttendanceRecordItem | null;
   }>({ key: '', record: null });
-  const [submittingAttendance, setSubmittingAttendance] = useState<boolean>(false);
 
   useEffect(() => {
     if (
@@ -94,30 +92,11 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
   const isExcused = studentAttendance?.status === 'Izin';
   const hasAttendanceRecord = isPresent || isExcused;
 
-  const handleStudentAttendance = async () => {
+  const handleStudentAttendance = () => {
     if (!currentSchedule) return;
-    try {
-      setSubmittingAttendance(true);
-      const res = await submitPracticumAttendance({
-        scheduleId: currentSchedule.id,
-        studentId: activeUser.id,
-        studentName: activeUser.name,
-        nim: activeUser.nim,
-      });
-      Alert.alert('Presensi Berhasil', res.message, [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('StudentHome'),
-        },
-      ]);
-    } catch (err) {
-      Alert.alert(
-        'Presensi Gagal',
-        err instanceof Error ? err.message : 'Presensi gagal dicatat.',
-      );
-    } finally {
-      setSubmittingAttendance(false);
-    }
+    navigation.navigate('StudentAttendance', {
+      scheduleId: currentSchedule.id,
+    });
   };
 
   if (schedulesLoading || schedulesError || !currentSchedule) {
@@ -315,15 +294,9 @@ export const SessionDetailScreen: React.FC<SessionDetailScreenProps> = ({
             currentSchedule.status === 'DIBUKA' &&
             !hasAttendanceRecord && (
               <CustomButton
-                title={submittingAttendance ? 'Mencatat...' : 'Presensi Sekarang'}
+                title="Presensi Sekarang"
                 variant="primary"
                 size="lg"
-                disabled={submittingAttendance}
-                leftIcon={
-                  submittingAttendance ? (
-                    <ActivityIndicator size="small" color={APP_COLORS.white} />
-                  ) : undefined
-                }
                 onPress={handleStudentAttendance}
               />
             )}

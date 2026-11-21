@@ -24,6 +24,7 @@ import {
   getSafeFirestoreDb,
 } from '@/services/firebaseClient';
 import type {
+  AttendanceLocationValidation,
   AttendanceRecordItem,
   AttendanceStats,
 } from '@/types/attendance';
@@ -36,6 +37,7 @@ export interface SubmitAttendanceInput {
   studentId: string;
   studentName: string;
   nim?: string;
+  locationValidation?: AttendanceLocationValidation;
 }
 
 export interface SubmitAttendanceResponse {
@@ -105,10 +107,19 @@ export function isDummyStudentId(id?: string): boolean {
 export async function submitPracticumAttendance(
   input: SubmitAttendanceInput,
 ): Promise<SubmitAttendanceResponse> {
-  const { scheduleId, studentId, studentName, nim } = input;
+  const { scheduleId, studentId, studentName, nim, locationValidation } = input;
 
   if (!scheduleId?.trim()) {
     throw new Error('ID jadwal praktikum tidak valid.');
+  }
+
+  // Validasi lokasi client-side jika disertakan
+  if (locationValidation) {
+    if (!locationValidation.isWithinRadius) {
+      throw new Error(
+        'Presensi ditolak: Posisi perangkat berada di luar radius laboratorium yang diizinkan.',
+      );
+    }
   }
 
   // Identitas Firebase Auth
