@@ -42,6 +42,12 @@
         {
           "bom": "34.19.0"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "BIRELA menggunakan lokasi Anda untuk menampilkan posisi pada peta laboratorium."
+        }
       ]
     ],
     "experiments": {
