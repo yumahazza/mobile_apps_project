@@ -12,6 +12,7 @@ import { AttendanceDetailScreen } from '@/screens/shared/AttendanceDetailScreen'
 import { AttendanceStatsScreen } from '@/screens/shared/AttendanceStatsScreen';
 import { ProfileScreen } from '@/screens/shared/ProfileScreen';
 import { NotificationScreen } from '@/screens/shared/NotificationScreen';
+import { LaboratoryMapScreen } from '@/screens/shared/LaboratoryMapScreen';
 import { NavigationProp, AssistantScreenName } from '@/navigation/navigationTypes';
 
 interface ScreenEntry {
@@ -33,6 +34,7 @@ export const AssistantStack: React.FC = () => {
     'SessionRecap',
     'ScheduleList',
     'Profile',
+    'LaboratoryMap',
   ];
 
   const navigation: NavigationProp = {
@@ -89,6 +91,9 @@ export const AssistantStack: React.FC = () => {
       )}
       {currentScreen === 'Notifications' && (
         <NotificationScreen navigation={navigation} />
+      )}
+      {currentScreen === 'LaboratoryMap' && (
+        <LaboratoryMapScreen navigation={navigation} />
       )}
       {currentScreen === 'LeaveApproval' && (
         <LeaveApprovalScreen navigation={navigation} />

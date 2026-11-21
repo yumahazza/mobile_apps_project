@@ -1,60 +1,36 @@
-/**
- * Yuma — Hook Real-time Data Laboratorium (Sprint 3)
- * Memantau koleksi `laboratories` dari Cloud Firestore via onSnapshot.
- */
 import { useEffect, useState } from 'react';
-import { subscribeToLaboratories } from '@/services/laboratoryService';
-import type { Laboratory } from '@/types/laboratory';
+import {
+  LaboratoryLocation,
+  subscribeToLaboratories,
+} from '@/services/laboratoryMapService';
 
-interface LaboratoriesState {
-  laboratories: Laboratory[];
+interface LaboratoryState {
+  laboratories: LaboratoryLocation[];
   loading: boolean;
   error: string | null;
 }
 
-export function useLaboratories(uid?: string): LaboratoriesState {
-  const activeUid = uid?.trim() || '';
-  const [state, setState] = useState<{
-    uid: string;
-    laboratories: Laboratory[];
-    error: string | null;
-  }>({
-    uid: '',
+export function useLaboratories(): LaboratoryState {
+  const [state, setState] = useState<LaboratoryState>({
     laboratories: [],
+    loading: true,
     error: null,
   });
 
   useEffect(() => {
-    if (!activeUid) {
-      return undefined;
-    }
-
-    const targetUid = activeUid;
     const unsubscribe = subscribeToLaboratories(
-      (laboratories) => {
-        setState({ uid: targetUid, laboratories, error: null });
-      },
-      (message) => {
-        setState({ uid: targetUid, laboratories: [], error: message });
-      },
+      laboratories =>
+        setState({ laboratories, loading: false, error: null }),
+      message =>
+        setState(previous => ({
+          ...previous,
+          loading: false,
+          error: message,
+        })),
     );
 
-    return () => {
-      unsubscribe();
-    };
-  }, [activeUid]);
+    return unsubscribe;
+  }, []);
 
-  if (!activeUid) {
-    return {
-      laboratories: [],
-      loading: false,
-      error: null,
-    };
-  }
-
-  return {
-    laboratories: state.uid === activeUid ? state.laboratories : [],
-    loading: state.uid !== activeUid,
-    error: state.uid === activeUid ? state.error : null,
-  };
+  return state;
 }
