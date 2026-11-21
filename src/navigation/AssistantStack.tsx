@@ -6,6 +6,7 @@ import { ScheduleScreen } from '@/screens/shared/ScheduleScreen';
 import { SessionDetailScreen } from '@/screens/shared/SessionDetailScreen';
 import { SessionControlScreen } from '@/screens/assistant/SessionControlScreen';
 import { LeaveApprovalScreen } from '@/screens/assistant/LeaveApprovalScreen';
+import { LaboratoryManagementScreen } from '@/screens/assistant/LaboratoryManagementScreen';
 import { StudentListScreen } from '@/screens/shared/StudentListScreen';
 import { AttendanceDetailScreen } from '@/screens/shared/AttendanceDetailScreen';
 import { AttendanceStatsScreen } from '@/screens/shared/AttendanceStatsScreen';
@@ -96,6 +97,9 @@ export const AssistantStack: React.FC = () => {
       )}
       {currentScreen === 'LeaveApproval' && (
         <LeaveApprovalScreen navigation={navigation} />
+      )}
+      {currentScreen === 'LaboratoryManagement' && (
+        <LaboratoryManagementScreen navigation={navigation} />
       )}
     </View>
   );
