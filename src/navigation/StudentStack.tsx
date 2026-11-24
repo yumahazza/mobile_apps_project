@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useApp } from '@/context/AppContext';
+import { resolveNotificationNavigation } from '@/services/notificationTriggerRules';
 import { StudentHomeScreen } from '@/screens/student/StudentHomeScreen';
 import { StudentHistoryScreen } from '@/screens/student/StudentHistoryScreen';
 import { LeaveRequestScreen } from '@/screens/student/LeaveRequestScreen';
@@ -18,8 +20,42 @@ interface ScreenEntry {
 }
 
 export const StudentStack: React.FC = () => {
+  const {
+    pendingNotificationPayload,
+    clearPendingNotificationPayload,
+    setActiveScheduleId,
+  } = useApp();
   const [history, setHistory] = useState<ScreenEntry[]>([
     { screen: 'StudentHome' },
+  ]);
+
+  useEffect(() => {
+    if (!pendingNotificationPayload) return undefined;
+
+    const timer = setTimeout(() => {
+      const target = resolveNotificationNavigation(
+        pendingNotificationPayload,
+        'student',
+      );
+      if (target.params?.scheduleId) {
+        setActiveScheduleId(target.params.scheduleId);
+      }
+
+      setHistory((prev) => [
+        ...prev,
+        {
+          screen: target.screen as StudentScreenName,
+          params: target.params,
+        },
+      ]);
+      clearPendingNotificationPayload();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    pendingNotificationPayload,
+    clearPendingNotificationPayload,
+    setActiveScheduleId,
   ]);
 
   const currentEntry = history[history.length - 1] || { screen: 'StudentHome' };

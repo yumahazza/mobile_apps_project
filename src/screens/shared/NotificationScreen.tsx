@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   View,
   Text,
   StyleSheet,
@@ -12,8 +13,13 @@ import { useApp } from '@/context/AppContext';
 import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useStudentLeaveRequests } from '@/hooks/useRealtimeLeaveRequests';
 import { useStudentAttendanceHistory } from '@/hooks/useStudentAttendanceHistory';
+import { useUserNotifications } from '@/hooks/useUserNotifications';
 import { subscribeToScheduleLeaveRequests } from '@/services/leaveRequestService';
+import { markNotificationAsRead } from '@/services/notificationHistoryService';
+import { resolveNotificationNavigation } from '@/services/notificationTriggerRules';
+import { openAppNotificationSettings } from '@/services/pushNotificationService';
 import type { LeaveRequestItem } from '@/types/leaveRequest';
+import type { NotificationType } from '@/types/notification';
 import { Card } from '@/components/Card';
 import { EmptyState } from '@/components/EmptyState';
 import { AppHeader } from '@/components/AppHeader';
@@ -38,13 +44,60 @@ interface NotificationItem {
   title: string;
   message: string;
   meta: string;
+  unread?: boolean;
   onPress: () => void;
+}
+
+function getPushNotificationStyle(type: NotificationType): {
+  iconName: keyof typeof Ionicons.glyphMap;
+  iconBgColor: string;
+  iconColor: string;
+} {
+  switch (type) {
+    case 'SESSION_OPENED':
+      return {
+        iconName: 'notifications-outline',
+        iconBgColor: APP_COLORS.openedSoft,
+        iconColor: APP_COLORS.opened,
+      };
+    case 'SCHEDULE_UPDATED':
+      return {
+        iconName: 'calendar-outline',
+        iconBgColor: APP_COLORS.softBlue,
+        iconColor: APP_COLORS.primary,
+      };
+    case 'LEAVE_APPROVED':
+      return {
+        iconName: 'checkmark-circle-outline',
+        iconBgColor: APP_COLORS.openedSoft,
+        iconColor: APP_COLORS.opened,
+      };
+    case 'LEAVE_REJECTED':
+      return {
+        iconName: 'close-circle-outline',
+        iconBgColor: APP_COLORS.dangerSoft,
+        iconColor: APP_COLORS.dangerText,
+      };
+  }
 }
 
 export const NotificationScreen: React.FC<NotificationScreenProps> = ({
   navigation,
 }) => {
-  const { activeRole, activeUser, setActiveScheduleId } = useApp();
+  const {
+    activeRole,
+    activeUser,
+    isAuthenticated,
+    setActiveScheduleId,
+    pushRegistration,
+    refreshPushRegistration,
+  } = useApp();
+
+  const {
+    notifications: storedNotifications,
+    unreadCount,
+    loading: storedNotifLoading,
+  } = useUserNotifications(isAuthenticated ? activeUser.id : undefined);
 
   const {
     schedules,
@@ -100,6 +153,40 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
 
   const notifications = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
+
+    // 1. Riwayat push notification otomatis dari koleksi `notifications` Firestore
+    storedNotifications.forEach((entry) => {
+      const styleMeta = getPushNotificationStyle(entry.type);
+      items.push({
+        id: `push-${entry.id}`,
+        iconName: styleMeta.iconName,
+        iconBgColor: styleMeta.iconBgColor,
+        iconColor: styleMeta.iconColor,
+        title: entry.title,
+        message: entry.body,
+        meta: entry.createdAt,
+        unread: !entry.readAt,
+        onPress: () => {
+          if (!entry.readAt) {
+            void markNotificationAsRead(entry.id);
+          }
+          const target = resolveNotificationNavigation(
+            {
+              type: entry.type,
+              relatedId: entry.relatedId,
+              scheduleId: entry.relatedId,
+            },
+            activeRole,
+          );
+          if (target.params?.scheduleId) {
+            setActiveScheduleId(target.params.scheduleId);
+          }
+          if (target.screen !== 'Notifications') {
+            navigation.navigate(target.screen, target.params);
+          }
+        },
+      });
+    });
 
     if (!isStudent) {
       schedules.forEach((schedule) => {
@@ -301,7 +388,9 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
 
     return items;
   }, [
+    activeRole,
     isStudent,
+    storedNotifications,
     schedules,
     assistantLeavesBySchedule,
     historyRecords,
@@ -311,19 +400,70 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
   ]);
 
   const isLoading =
-    schedulesLoading || (isStudent && (studentLeavesLoading || historyLoading));
+    storedNotifLoading ||
+    schedulesLoading ||
+    (isStudent && (studentLeavesLoading || historyLoading));
+
+  const showPushWarning =
+    !pushRegistration.isRegistering &&
+    (pushRegistration.permissionStatus === 'denied' ||
+      Boolean(pushRegistration.error));
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <AppHeader
         title="Notifikasi"
         onBack={() => navigation.goBack()}
-        hasUnreadNotifications={false}
+        hasUnreadNotifications={unreadCount > 0}
       />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}>
+        {showPushWarning ? (
+          <View style={styles.pushStatusBanner}>
+            <View style={styles.pushStatusHeader}>
+              <Ionicons
+                name="notifications-off-outline"
+                size={18}
+                color={APP_COLORS.dangerText}
+              />
+              <Text style={styles.pushStatusTitle}>
+                {pushRegistration.permissionStatus === 'denied'
+                  ? 'Izin Notifikasi Belum Aktif'
+                  : 'Push Notification Belum Tersinkron'}
+              </Text>
+            </View>
+            <Text style={styles.pushStatusDesc}>
+              {pushRegistration.error ||
+                'Aktifkan izin notifikasi agar pemberitahuan pembukaan sesi, perubahan jadwal, dan keputusan izin dapat diterima.'}
+            </Text>
+            <View style={styles.pushStatusActions}>
+              {pushRegistration.permissionStatus === 'denied' ? (
+                <Pressable
+                  onPress={() => {
+                    void openAppNotificationSettings();
+                  }}
+                  style={({ pressed }) => [
+                    styles.pushActionPrimary,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={styles.pushActionPrimaryText}>
+                    Buka Pengaturan
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={refreshPushRegistration}
+                style={({ pressed }) => [
+                  styles.pushActionSecondary,
+                  pressed && styles.pressed,
+                ]}>
+                <Text style={styles.pushActionSecondaryText}>Coba Lagi</Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         {isLoading ? (
           <View style={styles.stateContainer}>
             <ActivityIndicator size="large" color={APP_COLORS.primary} />
@@ -361,7 +501,12 @@ export const NotificationScreen: React.FC<NotificationScreenProps> = ({
                     />
                   </View>
                   <View style={styles.textContent}>
-                    <Text style={styles.notifTitle}>{item.title}</Text>
+                    <View style={styles.titleRow}>
+                      <Text style={styles.notifTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      {item.unread ? <View style={styles.unreadDot} /> : null}
+                    </View>
                     <Text style={styles.notifMessage} numberOfLines={2}>
                       {item.message}
                     </Text>
@@ -452,6 +597,74 @@ const styles = StyleSheet.create({
     fontFamily: APP_FONTS.regular,
     fontSize: 11,
     color: APP_COLORS.textMuted,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: APP_COLORS.primary,
+  },
+  pushStatusBanner: {
+    backgroundColor: APP_COLORS.dangerSoft,
+    borderWidth: 1,
+    borderColor: APP_COLORS.danger,
+    borderRadius: APP_RADIUS.card,
+    padding: APP_SPACING.md,
+    marginBottom: APP_SPACING.md,
+  },
+  pushStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  pushStatusTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.dangerText,
+  },
+  pushStatusDesc: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 12,
+    color: APP_COLORS.inkPrimary,
+    lineHeight: 17,
+  },
+  pushStatusActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+  },
+  pushActionPrimary: {
+    backgroundColor: APP_COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: APP_RADIUS.sm,
+  },
+  pushActionPrimaryText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.white,
+  },
+  pushActionSecondary: {
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: APP_RADIUS.sm,
+  },
+  pushActionSecondaryText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.inkPrimary,
+  },
+  pressed: {
+    opacity: 0.78,
   },
 });
 

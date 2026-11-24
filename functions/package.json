@@ -1,0 +1,17 @@
+{
+  "name": "ppk-push-notification-functions",
+  "description": "Firebase Cloud Functions untuk pemicu otomatis Push Notification FCM (Sprint 3 - Fritz)",
+  "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
+  "scripts": {
+    "worker": "node worker.js",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.2.0",
+    "firebase-functions": "^6.3.2"
+  },
+  "private": true
+}
