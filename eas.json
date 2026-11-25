@@ -13,6 +13,7 @@
       }
     },
     "preview": {
+      "node": "24.12.0",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
