@@ -25,6 +25,15 @@ import {
   getUserProfile,
   signOut,
 } from '@/services/authService';
+import {
+  removeUserFcmToken,
+  setupUserPushNotifications,
+  type PushNotificationSessionHandle,
+} from '@/services/pushNotificationService';
+import type {
+  PushNotificationPayload,
+  PushRegistrationState,
+} from '@/types/notification';
 
 import {
   User,
@@ -97,6 +106,14 @@ export interface AppContextType {
   getStudentHistory: (
     studentId: string
   ) => (AttendanceRecord & { schedule?: Schedule })[];
+
+  // Push Notifications (FCM - Sprint 3 Fritz)
+  pushRegistration: PushRegistrationState;
+  latestForegroundNotification: PushNotificationPayload | null;
+  pendingNotificationPayload: PushNotificationPayload | null;
+  refreshPushRegistration: () => void;
+  dismissForegroundNotification: () => void;
+  clearPendingNotificationPayload: () => void;
 
   // Reset
   resetDemoData: () => void;
@@ -181,6 +198,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   // Token untuk mengabaikan hasil async dari sesi auth lama.
   const authRequestIdRef = useRef(0);
+
+  // Push Notification (FCM) state
+  const [pushRegistration, setPushRegistration] = useState<PushRegistrationState>({
+    permissionStatus: 'not_determined',
+    fcmToken: null,
+    tokenSynced: false,
+    error: null,
+    isRegistering: false,
+  });
+  const [pushRetryCount, setPushRetryCount] = useState(0);
+  const [latestForegroundNotification, setLatestForegroundNotification] =
+    useState<PushNotificationPayload | null>(null);
+  const [pendingNotificationPayload, setPendingNotificationPayload] =
+    useState<PushNotificationPayload | null>(null);
+  const pushSessionRef = useRef<PushNotificationSessionHandle | null>(null);
 
   // Existing local demo data
   const [schedules, setSchedules] =
@@ -329,11 +361,79 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
+  // Sinkronisasi izin notifikasi, token FCM, dan listener foreground/background untuk akun aktif
+  useEffect(() => {
+    if (!isAuthenticated || !activeUser.id) {
+      pushSessionRef.current?.unsubscribe();
+      pushSessionRef.current = null;
+      return undefined;
+    }
+
+    const session = setupUserPushNotifications(activeUser.id, {
+      onStateChange: (nextState) => {
+        setPushRegistration(nextState);
+      },
+      onForegroundMessage: (payload) => {
+        setLatestForegroundNotification(payload);
+      },
+      onNotificationOpened: (payload) => {
+        setPendingNotificationPayload(payload);
+      },
+    });
+
+    pushSessionRef.current = session;
+
+    return () => {
+      session.unsubscribe();
+      if (pushSessionRef.current === session) {
+        pushSessionRef.current = null;
+      }
+    };
+  }, [isAuthenticated, activeUser.id, pushRetryCount]);
+
+  const effectivePushRegistration: PushRegistrationState =
+    isAuthenticated && activeUser.id
+      ? pushRegistration
+      : {
+          permissionStatus: 'not_determined',
+          fcmToken: null,
+          tokenSynced: false,
+          error: null,
+          isRegistering: false,
+        };
+  const effectiveLatestForegroundNotification =
+    isAuthenticated && activeUser.id ? latestForegroundNotification : null;
+  const effectivePendingNotificationPayload =
+    isAuthenticated && activeUser.id ? pendingNotificationPayload : null;
+
+  const refreshPushRegistration = (): void => {
+    setPushRetryCount((prev) => prev + 1);
+  };
+
+  const dismissForegroundNotification = (): void => {
+    setLatestForegroundNotification(null);
+  };
+
+  const clearPendingNotificationPayload = (): void => {
+    setPendingNotificationPayload(null);
+  };
+
   // Logout from Firebase
   const logout = async (): Promise<void> => {
     setAuthError(null);
 
     try {
+      const activeToken =
+        pushSessionRef.current?.getCurrentToken() ?? pushRegistration.fcmToken;
+      if (isAuthenticated && activeUser.id && activeToken) {
+        await removeUserFcmToken(activeUser.id, activeToken);
+      }
+
+      pushSessionRef.current?.unsubscribe();
+      pushSessionRef.current = null;
+      setLatestForegroundNotification(null);
+      setPendingNotificationPayload(null);
+
       await signOut();
       // onAuthStateChanged will update the authentication state.
     } catch (error) {
@@ -556,6 +656,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         getStudentAttendanceForSchedule,
         getAttendanceForSchedule,
         getStudentHistory,
+
+        // Push Notifications (FCM - Sprint 3 Fritz)
+        pushRegistration: effectivePushRegistration,
+        latestForegroundNotification: effectiveLatestForegroundNotification,
+        pendingNotificationPayload: effectivePendingNotificationPayload,
+        refreshPushRegistration,
+        dismissForegroundNotification,
+        clearPendingNotificationPayload,
 
         // Reset
         resetDemoData,

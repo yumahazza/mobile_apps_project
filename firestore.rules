@@ -99,6 +99,32 @@ service cloud.firestore {
 
     // USERS
 
+    function validOptionalProfileString(data, field, maxLen) {
+      return !(field in data)
+        || data[field] == null
+        || (
+          data[field] is string
+          && data[field].size() <= maxLen
+        );
+    }
+
+    function validOptionalFcmTokens(data) {
+      return !('fcmTokens' in data)
+        || (
+          data.fcmTokens is list
+          && data.fcmTokens.size() <= 20
+        );
+    }
+
+    function validUserProfileUpdate(data) {
+      return data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 150
+        && validOptionalProfileString(data, 'nim', 50)
+        && validOptionalProfileString(data, 'department', 150)
+        && validOptionalFcmTokens(data);
+    }
+
     match /users/{uid} {
 
       allow get: if signedIn()
@@ -142,8 +168,15 @@ service cloud.firestore {
             'name',
             'nim',
             'department',
+            'fcmTokens',
             'updatedAt'
-          ]);
+          ])
+        && validUserProfileUpdate(request.resource.data)
+        && (
+          !request.resource.data.diff(resource.data)
+            .affectedKeys().hasAny(['updatedAt'])
+          || request.resource.data.updatedAt is timestamp
+        );
 
       allow delete: if false;
     }
@@ -525,6 +558,31 @@ service cloud.firestore {
             ).data.studentId == resource.data.studentId
           )
         );
+
+      allow delete: if false;
+    }
+
+    // NOTIFICATIONS
+    // Dokumen riwayat notifikasi ditulis eksklusif oleh Cloud Functions (Admin SDK)
+    // dengan skema: { id, recipientUid, title, body, type, relatedId, createdAt, readAt }.
+
+    function validNotificationReadUpdate() {
+      return request.resource.data.diff(resource.data)
+        .affectedKeys().hasOnly(['readAt'])
+        && resource.data.readAt == null
+        && request.resource.data.readAt == request.time;
+    }
+
+    match /notifications/{notificationId} {
+
+      allow get, list: if signedIn()
+        && resource.data.recipientUid == request.auth.uid;
+
+      allow create: if false;
+
+      allow update: if signedIn()
+        && resource.data.recipientUid == request.auth.uid
+        && validNotificationReadUpdate();
 
       allow delete: if false;
     }

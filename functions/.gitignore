@@ -1,0 +1,4 @@
+# Jangan pernah commit kredensial Firebase Admin Service Account
+serviceAccountKey.json
+*firebase-adminsdk*.json
+.env
