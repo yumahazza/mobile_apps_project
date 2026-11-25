@@ -251,17 +251,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       await Promise.resolve();
       if (!isMounted) return;
 
-      if (Platform.OS === 'web') {
-        setActiveUser(DEFAULT_USER);
-        setIsAuthenticated(false);
-        setFirebaseUnavailable(true);
-        setAuthError(
-          'Mode Web tidak mendukung Firebase native (@react-native-firebase) dan listener real-time Firestore.'
-        );
-        setAuthLoading(false);
-        return;
-      }
-
       try {
         const auth = getAuth();
         const authUnsubscribe = onAuthStateChanged(
