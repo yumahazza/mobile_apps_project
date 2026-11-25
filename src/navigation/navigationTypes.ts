@@ -22,7 +22,6 @@ export type AssistantScreenName =
   | 'AttendanceStats'
   | 'LeaveApproval'
   | 'LaboratoryManagement'
-  | 'Notifications';
   | 'Notifications'
   | 'LaboratoryMap';
 
