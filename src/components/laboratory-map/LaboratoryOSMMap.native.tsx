@@ -7,6 +7,16 @@ import WebView, {
 import type { LaboratoryOSMMapProps } from './LaboratoryOSMMap.types';
 import { OSM_WEBVIEW_BASE_URL, createOSMHtml } from './mapHtml';
 
+interface WebViewHandle {
+  injectJavaScript: (script: string) => void;
+}
+
+// Tipe react-native-webview belum cocok dengan @types/react 19 (props menjadi `never`),
+// sehingga komponen dibungkus dengan tipe minimal yang kita pakai.
+const MapWebView = WebView as unknown as React.ForwardRefExoticComponent<
+  Record<string, unknown> & React.RefAttributes<WebViewHandle>
+>;
+
 const LaboratoryOSMMap: React.FC<LaboratoryOSMMapProps> = ({
   laboratories,
   selectedLaboratoryId,
@@ -19,7 +29,7 @@ const LaboratoryOSMMap: React.FC<LaboratoryOSMMapProps> = ({
   onPickLocation,
   onSelectLaboratory,
 }) => {
-  const webViewRef = useRef<WebView>(null);
+  const webViewRef = useRef<WebViewHandle>(null);
   const readyRef = useRef(false);
 
   // HTML dibuat sekali; data selanjutnya dikirim lewat injectJavaScript.
@@ -86,7 +96,7 @@ const LaboratoryOSMMap: React.FC<LaboratoryOSMMapProps> = ({
 
   return (
     <View style={styles.container}>
-      <WebView
+      <MapWebView
         ref={webViewRef}
         originWhitelist={['*']}
         source={source}
@@ -94,7 +104,7 @@ const LaboratoryOSMMap: React.FC<LaboratoryOSMMapProps> = ({
         domStorageEnabled
         setSupportMultipleWindows={false}
         onMessage={handleMessage}
-        onShouldStartLoadWithRequest={request => {
+        onShouldStartLoadWithRequest={(request: { url: string }) => {
           // Tautan atribusi OSM/Leaflet dibuka di browser, bukan di dalam peta.
           if (
             request.url === OSM_WEBVIEW_BASE_URL ||
