@@ -48,7 +48,8 @@
         {
           "locationWhenInUsePermission": "Izinkan $(PRODUCT_NAME) mengakses lokasi Anda untuk memverifikasi area presensi praktikum dan menampilkan posisi Anda pada peta laboratorium."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

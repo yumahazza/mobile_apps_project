@@ -71,6 +71,8 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   const [students, setStudents] = useState<StudentOption[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PracticumSchedule | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -97,6 +99,8 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const openCreate = () => {
+    setActionError(null);
+    setFormError(null);
     setEditingSchedule(null);
     setForm(emptyForm());
     setModalVisible(true);
@@ -104,6 +108,8 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const openEdit = (schedule: PracticumSchedule) => {
+    setActionError(null);
+    setFormError(null);
     setEditingSchedule(schedule);
     const matchedLab = resolveLaboratoryForSchedule(schedule, laboratories);
     setForm({
@@ -120,6 +126,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const updateField = (field: keyof ScheduleInput, value: string) => {
+    setFormError(null);
     setForm((prev) => {
       if (field !== 'room') {
         return { ...prev, [field]: value };
@@ -135,6 +142,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const selectLaboratory = (lab: Laboratory) => {
+    setFormError(null);
     setForm((prev) => {
       if (prev.laboratoryId === lab.id) {
         return { ...prev, laboratoryId: null };
@@ -148,6 +156,7 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const toggleStudent = (uid: string) => {
+    setFormError(null);
     setForm((prev) => ({
       ...prev,
       enrolledStudents: prev.enrolledStudents.includes(uid)
@@ -157,35 +166,39 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   };
 
   const saveSchedule = async () => {
+    if (saving) return;
+
     setSaving(true);
+    setFormError(null);
     try {
       if (editingSchedule) {
         await updatePracticumSchedule(editingSchedule.id, form);
+        setModalVisible(false);
         Alert.alert('Berhasil', 'Jadwal berhasil diperbarui.');
       } else {
         await createPracticumSchedule(form, {
           uid: activeUser.id,
           name: activeUser.name,
         });
+        setModalVisible(false);
         Alert.alert('Berhasil', 'Jadwal baru berhasil dibuat.');
       }
-      setModalVisible(false);
     } catch (err) {
-      Alert.alert(
-        'Gagal menyimpan jadwal',
-        err instanceof Error ? err.message : 'Terjadi kesalahan.',
-      );
+      const message =
+        err instanceof Error ? err.message : 'Terjadi kesalahan saat menyimpan jadwal.';
+      setFormError(message);
+      Alert.alert('Gagal menyimpan jadwal', message);
     } finally {
       setSaving(false);
     }
   };
 
   const confirmDelete = (schedule: PracticumSchedule) => {
+    setActionError(null);
     if (schedule.status === 'DIBUKA') {
-      Alert.alert(
-        'Jadwal sedang dibuka',
-        'Tutup sesi terlebih dahulu sebelum menghapus.',
-      );
+      const message = 'Jadwal sedang dibuka. Tutup sesi terlebih dahulu sebelum menghapus.';
+      setActionError(message);
+      Alert.alert('Jadwal sedang dibuka', 'Tutup sesi terlebih dahulu sebelum menghapus.');
       return;
     }
     setDeleteTarget(schedule);
@@ -194,14 +207,14 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
   const executeDelete = async () => {
     if (!deleteTarget || deleting) return;
     setDeleting(true);
+    setActionError(null);
     try {
       await deletePracticumSchedule(deleteTarget.id);
       setDeleteTarget(null);
     } catch (err) {
-      Alert.alert(
-        'Gagal menghapus',
-        err instanceof Error ? err.message : 'Periksa izin akses.',
-      );
+      const message = err instanceof Error ? err.message : 'Periksa izin akses.';
+      setActionError(`Gagal menghapus jadwal: ${message}`);
+      Alert.alert('Gagal menghapus', message);
     } finally {
       setDeleting(false);
     }
@@ -252,6 +265,17 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
             </View>
           )}
         </View>
+
+        {!!actionError && (
+          <View style={styles.formErrorBox}>
+            <Ionicons
+              name="alert-circle"
+              size={16}
+              color={APP_COLORS.dangerText}
+            />
+            <Text style={styles.formErrorText}>{actionError}</Text>
+          </View>
+        )}
 
         {loading && (
           <View style={styles.stateBox}>
@@ -507,6 +531,16 @@ export const ScheduleScreen: React.FC<ScheduleScreenProps> = ({ navigation }) =>
               <Text style={styles.selectionHint}>
                 {form.enrolledStudents.length} peserta dipilih
               </Text>
+              {formError && (
+                <View style={styles.formErrorBox}>
+                  <Ionicons
+                    name="alert-circle"
+                    size={16}
+                    color={APP_COLORS.dangerText}
+                  />
+                  <Text style={styles.formErrorText}>{formError}</Text>
+                </View>
+              )}
               <CustomButton
                 title={editingSchedule ? 'Simpan Perubahan' : 'Simpan Jadwal'}
                 variant="primary"
@@ -856,6 +890,23 @@ const styles = StyleSheet.create({
   },
   labChipMetaSelected: {
     color: APP_COLORS.nordicBreeze,
+  },
+  formErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: APP_COLORS.dangerSoft,
+    borderRadius: APP_RADIUS.md,
+    paddingHorizontal: APP_SPACING.md,
+    paddingVertical: APP_SPACING.sm,
+    marginBottom: APP_SPACING.sm,
+  },
+  formErrorText: {
+    flex: 1,
+    fontFamily: APP_FONTS.medium,
+    fontSize: 12,
+    lineHeight: 17,
+    color: APP_COLORS.dangerText,
   },
   saveButton: {
     marginTop: 6,

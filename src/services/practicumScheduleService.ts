@@ -88,22 +88,25 @@ function mapSchedule(id: string, raw: Record<string, unknown>): PracticumSchedul
 }
 
 export function validateScheduleInput(input: ScheduleInput): string | null {
-  const required: Array<[string, string]> = [
+  const trimmedDate = input.date.trim();
+  const trimmedTime = input.time.trim();
+
+  const required: [string, string][] = [
     ['Nama mata praktikum', input.courseName],
     ['Nama kelas', input.className],
     ['Ruangan', input.room],
-    ['Tanggal', input.date],
-    ['Waktu', input.time],
+    ['Tanggal', trimmedDate],
+    ['Waktu', trimmedTime],
   ];
 
   const missing = required.find(([, value]) => !value.trim());
   if (missing) return `${missing[0]} wajib diisi.`;
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmedDate)) {
     return 'Tanggal harus menggunakan format YYYY-MM-DD.';
   }
 
-  const [year, month, day] = input.date.split('-').map(Number);
+  const [year, month, day] = trimmedDate.split('-').map(Number);
 
   const parsedDate = new Date(Date.UTC(year, month - 1, day));
   if (
@@ -115,7 +118,7 @@ export function validateScheduleInput(input: ScheduleInput): string | null {
     return 'Tanggal tidak valid.';
   }
 
-  const timeMatch = input.time.match(/^([01]\d|2[0-3]):([0-5]\d)\s*-\s*([01]\d|2[0-3]):([0-5]\d)$/);
+  const timeMatch = trimmedTime.match(/^([01]\d|2[0-3]):([0-5]\d)\s*-\s*([01]\d|2[0-3]):([0-5]\d)$/);
   if (!timeMatch) return 'Waktu harus berformat HH:mm - HH:mm.';
 
   const start = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
@@ -185,7 +188,7 @@ export async function createPracticumSchedule(
     className: input.className.trim(),
     room: input.room.trim(),
     laboratoryId,
-    date: input.date,
+    date: input.date.trim(),
     time: input.time.trim(),
     status: 'BELUM_DIBUKA',
     assistantId: assistant.uid,
@@ -214,7 +217,7 @@ export async function updatePracticumSchedule(
     className: input.className.trim(),
     room: input.room.trim(),
     laboratoryId,
-    date: input.date,
+    date: input.date.trim(),
     time: input.time.trim(),
     enrolledStudents,
     totalStudents: enrolledStudents.length,
