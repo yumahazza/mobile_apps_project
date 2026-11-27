@@ -1,13 +1,18 @@
 /**
  * Birela location adapter.
  *
- * The Sprint 3 task document says this screen should consume the shared
- * location helper prepared by Yuma. That helper was not present in the
- * Sprint 2 project archive supplied for this task, so this adapter currently
- * uses Expo Location behind a small interface. When Yuma's helper is merged,
- * replace the implementation here only; LaboratoryMapScreen stays unchanged.
+ * Membungkus helper lokasi bersama (`locationService`, milik Yuma) agar layar
+ * peta memakai satu sumber pembacaan lokasi, termasuk penanganan izin ditolak,
+ * ditolak permanen, dan GPS/layanan lokasi mati.
  */
-import * as Location from 'expo-location';
+import {
+  getCurrentDeviceLocation,
+  watchDeviceLocation,
+} from '@/services/locationService';
+import type {
+  DeviceLocationData,
+  LocationServiceError,
+} from '@/types/location';
 
 export interface DeviceCoordinates {
   latitude: number;
@@ -15,42 +20,38 @@ export interface DeviceCoordinates {
   accuracy: number | null;
 }
 
-export type LocationUpdate = (coordinates: DeviceCoordinates) => void;
+export type MapLocationResult =
+  | { ok: true; data: DeviceCoordinates }
+  | { ok: false; error: LocationServiceError };
 
-export async function requestMapLocationPermission(): Promise<boolean> {
-  const current = await Location.getForegroundPermissionsAsync();
-  if (current.granted) return true;
-
-  const requested = await Location.requestForegroundPermissionsAsync();
-  return requested.granted;
-}
-
-export async function getCurrentMapLocation(): Promise<DeviceCoordinates> {
-  const position = await Location.getCurrentPositionAsync({
-    accuracy: Location.Accuracy.Balanced,
-  });
+function toCoordinates(location: DeviceLocationData): DeviceCoordinates {
   return {
-    latitude: position.coords.latitude,
-    longitude: position.coords.longitude,
-    accuracy: position.coords.accuracy,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    accuracy: location.accuracy,
   };
 }
 
-export async function watchMapLocation(
-  onUpdate: LocationUpdate,
-): Promise<Location.LocationSubscription> {
-  return Location.watchPositionAsync(
-    {
-      accuracy: Location.Accuracy.Balanced,
-      timeInterval: 5000,
-      distanceInterval: 10,
-    },
-    position => {
-      onUpdate({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-      });
-    },
+/** Ambil lokasi sekali (meminta izin bila perlu). */
+export async function getCurrentMapLocation(): Promise<MapLocationResult> {
+  const result = await getCurrentDeviceLocation({
+    allowLastKnownFallback: true,
+    promptEnableServices: true,
+  });
+  if (result.ok) {
+    return { ok: true, data: toCoordinates(result.data) };
+  }
+  return result;
+}
+
+/** Pantau lokasi berkelanjutan. Mengembalikan fungsi cleanup yang aman dipanggil kapan saja. */
+export function watchMapLocation(
+  onUpdate: (coordinates: DeviceCoordinates) => void,
+  onError: (error: LocationServiceError) => void,
+): () => void {
+  return watchDeviceLocation(
+    location => onUpdate(toCoordinates(location)),
+    onError,
+    { distanceInterval: 10, timeInterval: 5000 },
   );
 }

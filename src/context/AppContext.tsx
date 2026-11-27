@@ -333,9 +333,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const logout = async (): Promise<void> => {
     setAuthError(null);
 
+    // Pembersihan token FCM bersifat best-effort: tidak boleh menahan logout
+    // (updateDoc Firestore menunggu server dan bisa menggantung saat offline).
     try {
+<<<<<<< Updated upstream
+=======
+      const activeToken =
+        pushSessionRef.current?.getCurrentToken() ?? pushRegistration.fcmToken;
+      if (isAuthenticated && activeUser.id && activeToken) {
+        await Promise.race([
+          removeUserFcmToken(activeUser.id, activeToken),
+          new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+        ]);
+      }
+    } catch {
+      // Abaikan: lanjutkan logout.
+    }
+
+    try {
+      pushSessionRef.current?.unsubscribe();
+    } catch {
+      // Abaikan: lanjutkan logout.
+    }
+    pushSessionRef.current = null;
+    setLatestForegroundNotification(null);
+    setPendingNotificationPayload(null);
+
+    try {
+>>>>>>> Stashed changes
       await signOut();
-      // onAuthStateChanged will update the authentication state.
     } catch (error) {
       const message =
         error instanceof Error
@@ -345,6 +371,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setAuthError(message);
       throw error;
     }
+
+    // Kembalikan UI ke layar login segera; onAuthStateChanged menyusul.
+    setIsAuthenticated(false);
+    setActiveUser(DEFAULT_USER);
   };
 
   // Demo role switching is available only when not authenticated.

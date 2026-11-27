@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
+import { confirmAction, showMessage } from '@/services/dialogService';
 import {
   APP_COLORS,
   APP_FONTS,
@@ -52,33 +52,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const handleLogout = () => {
     if (loggingOut) return;
 
-    Alert.alert(
-      'Logout',
-      'Keluar dari akun ini?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
+    confirmAction({
+      title: 'Logout',
+      message: 'Keluar dari akun ini?',
+      confirmText: 'Logout',
+      destructive: true,
+      onConfirm: async () => {
+        setLoggingOut(true);
 
-            try {
-              await logout();
-            } catch (error) {
-              Alert.alert(
-                'Logout gagal',
-                error instanceof Error
-                  ? error.message
-                  : 'Terjadi kesalahan. Silakan coba lagi.',
-              );
-            } finally {
-              setLoggingOut(false);
-            }
-          },
-        },
-      ],
-    );
+        try {
+          await logout();
+        } catch (error) {
+          showMessage(
+            'Logout gagal',
+            error instanceof Error
+              ? error.message
+              : 'Terjadi kesalahan. Silakan coba lagi.',
+          );
+        } finally {
+          setLoggingOut(false);
+        }
+      },
+    });
   };
 
   return (
