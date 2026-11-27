@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Alert,
   Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +13,7 @@ import { useApp } from '@/context/AppContext';
 import { Card } from '@/components/Card';
 import { AppHeader } from '@/components/AppHeader';
 import { BottomNavigation } from '@/components/BottomNavigation';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { CustomButton } from '@/components/CustomButton';
 import { NavigationProp } from '@/navigation/navigationTypes';
 import {
@@ -38,8 +38,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   } = useApp();
 
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const [activeModal, setActiveModal] = useState<
-    'info' | 'settings' | 'help' | null
+    'info' | 'settings' | 'help' | 'logout' | null
   >(null);
 
   const initials = (activeUser.name || 'U')
@@ -52,33 +53,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const handleLogout = () => {
     if (loggingOut) return;
 
-    Alert.alert(
-      'Logout',
-      'Keluar dari akun ini?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            setLoggingOut(true);
+    setLogoutError(null);
+    setActiveModal('logout');
+  };
 
-            try {
-              await logout();
-            } catch (error) {
-              Alert.alert(
-                'Logout gagal',
-                error instanceof Error
-                  ? error.message
-                  : 'Terjadi kesalahan. Silakan coba lagi.',
-              );
-            } finally {
-              setLoggingOut(false);
-            }
-          },
-        },
-      ],
-    );
+  const handleCancelLogout = () => {
+    if (loggingOut) return;
+
+    setLogoutError(null);
+    setActiveModal(null);
+  };
+
+  const handleConfirmLogout = async () => {
+    if (loggingOut) return;
+
+    setLoggingOut(true);
+    setLogoutError(null);
+
+    try {
+      await logout();
+      setActiveModal(null);
+    } catch (error) {
+      setLogoutError(
+        error instanceof Error
+          ? error.message
+          : 'Terjadi kesalahan. Silakan coba lagi.',
+      );
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -363,6 +366,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </View>
         </View>
       </Modal>
+
+      <ConfirmModal
+        visible={activeModal === 'logout'}
+        title="Logout"
+        subtitle={
+          logoutError
+            ? `Logout gagal: ${logoutError}`
+            : 'Keluar dari akun ini?'
+        }
+        confirmText={logoutError ? 'Coba Lagi' : 'Logout'}
+        cancelText="Batal"
+        confirmVariant="danger"
+        loading={loggingOut}
+        onConfirm={handleConfirmLogout}
+        onCancel={handleCancelLogout}
+      />
 
       <BottomNavigation
         role={activeRole}
