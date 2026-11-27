@@ -70,9 +70,7 @@ export const DonutChart: React.FC<DonutChartProps> = ({
               strokeDasharray={`${circumference} ${circumference}`}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="butt"
-              rotation={-90}
-              originX={center}
-              originY={center}
+              transform={`rotate(-90 ${center} ${center})`}
             />
           )}
         </Svg>

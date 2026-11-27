@@ -1,5 +1,6 @@
 import {
   getFirestore as getWebFirestore,
+  addDoc,
   collection,
   doc,
   getDoc,
@@ -31,6 +32,7 @@ export function getFirestore(app?: any): Firestore {
 }
 
 export {
+  addDoc,
   collection,
   doc,
   getDoc,
