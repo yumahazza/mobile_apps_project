@@ -13,8 +13,10 @@ import {
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { AppProvider } from '@/context/AppContext';
+import { registerBackgroundPushHandler } from '@/services/pushNotificationService';
 
 SplashScreen.preventAutoHideAsync();
+registerBackgroundPushHandler();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

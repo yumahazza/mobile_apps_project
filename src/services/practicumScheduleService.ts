@@ -34,6 +34,7 @@ export interface PracticumSchedule {
   courseName: string;
   className: string;
   room: string;
+  laboratoryId?: string | null;
   date: string; // YYYY-MM-DD
   time: string; // HH:mm - HH:mm
   status: SessionStatus;
@@ -49,6 +50,7 @@ export interface ScheduleInput {
   courseName: string;
   className: string;
   room: string;
+  laboratoryId?: string | null;
   date: string;
   time: string;
   enrolledStudents: string[];
@@ -64,11 +66,13 @@ export interface StudentOption {
 export type ScheduleRole = 'assistant' | 'student';
 
 function mapSchedule(id: string, raw: Record<string, unknown>): PracticumSchedule {
+  const rawLabId = typeof raw.laboratoryId === 'string' ? raw.laboratoryId.trim() : '';
   return {
     id,
     courseName: String(raw.courseName ?? ''),
     className: String(raw.className ?? ''),
     room: String(raw.room ?? ''),
+    laboratoryId: rawLabId || null,
     date: String(raw.date ?? ''),
     time: String(raw.time ?? ''),
     status: (raw.status as SessionStatus) ?? 'BELUM_DIBUKA',
@@ -175,10 +179,12 @@ export async function createPracticumSchedule(
 
   const db = getFirestoreDb();
   const enrolledStudents = [...new Set(input.enrolledStudents)];
+  const laboratoryId = input.laboratoryId?.trim() || null;
   const created = await addDoc(collection(db, SCHEDULES_COLLECTION), {
     courseName: input.courseName.trim(),
     className: input.className.trim(),
     room: input.room.trim(),
+    laboratoryId,
     date: input.date,
     time: input.time.trim(),
     status: 'BELUM_DIBUKA',
@@ -202,10 +208,12 @@ export async function updatePracticumSchedule(
 
   const db = getFirestoreDb();
   const enrolledStudents = [...new Set(input.enrolledStudents)];
+  const laboratoryId = input.laboratoryId?.trim() || null;
   await updateDoc(doc(db, SCHEDULES_COLLECTION, scheduleId), {
     courseName: input.courseName.trim(),
     className: input.className.trim(),
     room: input.room.trim(),
+    laboratoryId,
     date: input.date,
     time: input.time.trim(),
     enrolledStudents,

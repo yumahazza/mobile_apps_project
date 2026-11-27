@@ -21,6 +21,7 @@ export type AssistantScreenName =
   | 'AttendanceDetail'
   | 'AttendanceStats'
   | 'LeaveApproval'
+  | 'LaboratoryManagement'
   | 'Notifications'
   | 'LaboratoryMap';
 
@@ -33,4 +34,5 @@ export type StudentScreenName =
   | 'SessionDetail'
   | 'AttendanceDetail'
   | 'Notifications'
-  | 'LaboratoryMap';
+  | 'LaboratoryMap'
+  | 'StudentAttendance';

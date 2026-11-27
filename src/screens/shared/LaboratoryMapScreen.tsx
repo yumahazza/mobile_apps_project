@@ -335,7 +335,6 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View>
-          <Text style={styles.eyebrow}>BIRELA · SPRINT 3</Text>
           <Text style={styles.title}>Peta Laboratorium</Text>
           <Text style={styles.subtitle}>
             Lokasi dan aktivitas praktikum secara real-time

@@ -133,6 +133,35 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             />
           </Pressable>
 
+          {activeRole === 'assistant' ? (
+            <Pressable
+              onPress={() =>
+                navigation.navigate('LaboratoryManagement', {
+                  fromTab: 'Profile',
+                })
+              }
+              style={({ pressed }) => [
+                styles.menuItem,
+                pressed && styles.pressed,
+              ]}>
+              <View style={styles.menuLeft}>
+                <View style={styles.menuIconBox}>
+                  <Ionicons
+                    name="location-outline"
+                    size={19}
+                    color={APP_COLORS.primary}
+                  />
+                </View>
+                <Text style={styles.menuLabel}>Lokasi Laboratorium</Text>
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={APP_COLORS.textMuted}
+              />
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={() => setActiveModal('settings')}
             style={({ pressed }) => [

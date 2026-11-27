@@ -23,6 +23,8 @@ export const AppNavigator: React.FC = () => {
     authError,
     firebaseUnavailable,
     logout,
+    latestForegroundNotification,
+    dismissForegroundNotification,
   } = useApp();
 
   const [loggingOut, setLoggingOut] = useState(false);
@@ -102,6 +104,29 @@ export const AppNavigator: React.FC = () => {
           ) : (
             <StudentStack />
           )}
+
+          {isAuthenticated && latestForegroundNotification ? (
+            <View style={styles.pushBannerWrapper} pointerEvents="box-none">
+              <View style={styles.pushBanner}>
+                <View style={styles.pushBannerTextBox}>
+                  <Text style={styles.pushBannerTitle} numberOfLines={1}>
+                    {latestForegroundNotification.title}
+                  </Text>
+                  <Text style={styles.pushBannerBody} numberOfLines={2}>
+                    {latestForegroundNotification.body}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={dismissForegroundNotification}
+                  style={({ pressed }) => [
+                    styles.pushBannerClose,
+                    pressed && styles.pressed,
+                  ]}>
+                  <Text style={styles.pushBannerCloseText}>Tutup</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
         </View>
       </View>
     </SafeAreaView>
@@ -177,6 +202,47 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.78,
+  },
+  pushBannerWrapper: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    zIndex: 50,
+  },
+  pushBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: APP_COLORS.inkPrimary,
+    borderRadius: APP_RADIUS.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  pushBannerTextBox: {
+    flex: 1,
+  },
+  pushBannerTitle: {
+    fontFamily: APP_FONTS.bold,
+    fontSize: 13,
+    color: APP_COLORS.white,
+  },
+  pushBannerBody: {
+    fontFamily: APP_FONTS.regular,
+    fontSize: 12,
+    color: APP_COLORS.white,
+    opacity: 0.9,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  pushBannerClose: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  pushBannerCloseText: {
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 12,
+    color: APP_COLORS.softBlue,
   },
 });
 

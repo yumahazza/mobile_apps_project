@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useApp } from '@/context/AppContext';
+import { resolveNotificationNavigation } from '@/services/notificationTriggerRules';
 import { AssistantHomeScreen } from '@/screens/assistant/AssistantHomeScreen';
 import { SessionRecapScreen } from '@/screens/assistant/SessionRecapScreen';
 import { ScheduleScreen } from '@/screens/shared/ScheduleScreen';
 import { SessionDetailScreen } from '@/screens/shared/SessionDetailScreen';
 import { SessionControlScreen } from '@/screens/assistant/SessionControlScreen';
 import { LeaveApprovalScreen } from '@/screens/assistant/LeaveApprovalScreen';
+import { LaboratoryManagementScreen } from '@/screens/assistant/LaboratoryManagementScreen';
 import { StudentListScreen } from '@/screens/shared/StudentListScreen';
 import { AttendanceDetailScreen } from '@/screens/shared/AttendanceDetailScreen';
 import { AttendanceStatsScreen } from '@/screens/shared/AttendanceStatsScreen';
@@ -20,8 +23,42 @@ interface ScreenEntry {
 }
 
 export const AssistantStack: React.FC = () => {
+  const {
+    pendingNotificationPayload,
+    clearPendingNotificationPayload,
+    setActiveScheduleId,
+  } = useApp();
   const [history, setHistory] = useState<ScreenEntry[]>([
     { screen: 'AssistantHome' },
+  ]);
+
+  useEffect(() => {
+    if (!pendingNotificationPayload) return undefined;
+
+    const timer = setTimeout(() => {
+      const target = resolveNotificationNavigation(
+        pendingNotificationPayload,
+        'assistant',
+      );
+      if (target.params?.scheduleId) {
+        setActiveScheduleId(target.params.scheduleId);
+      }
+
+      setHistory((prev) => [
+        ...prev,
+        {
+          screen: target.screen as AssistantScreenName,
+          params: target.params,
+        },
+      ]);
+      clearPendingNotificationPayload();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    pendingNotificationPayload,
+    clearPendingNotificationPayload,
+    setActiveScheduleId,
   ]);
 
   const currentEntry = history[history.length - 1] || { screen: 'AssistantHome' };
@@ -96,6 +133,9 @@ export const AssistantStack: React.FC = () => {
       )}
       {currentScreen === 'LeaveApproval' && (
         <LeaveApprovalScreen navigation={navigation} />
+      )}
+      {currentScreen === 'LaboratoryManagement' && (
+        <LaboratoryManagementScreen navigation={navigation} />
       )}
     </View>
   );
