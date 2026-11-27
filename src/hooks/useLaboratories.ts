@@ -1,16 +1,20 @@
 import { useEffect, useState } from 'react';
-import {
-  LaboratoryLocation,
-  subscribeToLaboratories,
-} from '@/services/laboratoryMapService';
+import type { Laboratory } from '@/types/laboratory';
+import { subscribeToLaboratories } from '@/services/laboratoryService';
 
 interface LaboratoryState {
-  laboratories: LaboratoryLocation[];
+  laboratories: Laboratory[];
   loading: boolean;
   error: string | null;
 }
 
-export function useLaboratories(): LaboratoryState {
+/**
+ * Langganan real-time koleksi `laboratories` (service milik Yuma).
+ * Dipakai bersama oleh Manajemen Lab, Jadwal, Presensi, dan Peta Birela.
+ * `_assistantUid` hanya dipertahankan agar pemanggil lama
+ * (`useLaboratories(isAssistant ? uid : undefined)`) tetap valid; tidak memengaruhi langganan.
+ */
+export function useLaboratories(_assistantUid?: string): LaboratoryState {
   const [state, setState] = useState<LaboratoryState>({
     laboratories: [],
     loading: true,

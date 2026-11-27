@@ -1,69 +1,123 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import WebView, { type WebViewMessageEvent } from 'react-native-webview';
+import { Linking, StyleSheet, View } from 'react-native';
+import WebView, {
+  type WebViewMessageEvent,
+} from 'react-native-webview';
 
 import type { LaboratoryOSMMapProps } from './LaboratoryOSMMap.types';
-import { createOSMHtml } from './mapHtml';
+import { OSM_WEBVIEW_BASE_URL, createOSMHtml } from './mapHtml';
+
+interface WebViewHandle {
+  injectJavaScript: (script: string) => void;
+}
+
+// Tipe react-native-webview belum cocok dengan @types/react 19 (props menjadi `never`),
+// sehingga komponen dibungkus dengan tipe minimal yang kita pakai.
+const MapWebView = WebView as unknown as React.ForwardRefExoticComponent<
+  Record<string, unknown> & React.RefAttributes<WebViewHandle>
+>;
 
 const LaboratoryOSMMap: React.FC<LaboratoryOSMMapProps> = ({
   laboratories,
   selectedLaboratoryId,
   deviceLocation,
   initialCenter,
+  deviceFocusToken = 0,
+  fitAllToken = 0,
+  pickMode = false,
+  pickedLocation = null,
+  onPickLocation,
   onSelectLaboratory,
 }) => {
-  const webViewRef = useRef<WebView>(null);
-  const html = useMemo(
-    () => createOSMHtml(laboratories, selectedLaboratoryId, deviceLocation, initialCenter),
-    [],
+  const webViewRef = useRef<WebViewHandle>(null);
+  const readyRef = useRef(false);
+
+  // HTML dibuat sekali; data selanjutnya dikirim lewat injectJavaScript.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const html = useMemo(() => createOSMHtml(initialCenter), []);
+  const source = useMemo(
+    () => ({ html, baseUrl: OSM_WEBVIEW_BASE_URL }),
+    [html],
   );
 
   const updateMap = useCallback(() => {
+    if (!readyRef.current) return;
     const payload = JSON.stringify({
       laboratories,
       selectedLaboratoryId,
       deviceLocation,
-      initialCenter,
-    }).replace(/</g, '\u003c');
-    webViewRef.current?.injectJavaScript(`window.updateOSMMap?.(${payload}); true;`);
-  }, [laboratories, selectedLaboratoryId, deviceLocation, initialCenter]);
+      deviceFocusToken,
+      fitAllToken,
+      pickMode,
+      pickedLocation,
+    }).replace(/</g, '\\u003c');
+    webViewRef.current?.injectJavaScript(
+      `window.updateOSMMap && window.updateOSMMap(${payload}); true;`,
+    );
+  }, [
+    laboratories,
+    selectedLaboratoryId,
+    deviceLocation,
+    deviceFocusToken,
+    fitAllToken,
+    pickMode,
+    pickedLocation,
+  ]);
 
   useEffect(() => {
     updateMap();
   }, [updateMap]);
 
-  useEffect(() => {
-    if (!selectedLaboratoryId) return;
-    const selected = laboratories.find(item => item.id === selectedLaboratoryId);
-    if (selected) {
-      webViewRef.current?.injectJavaScript(
-        `window.centerOSMMap?.(${selected.latitude}, ${selected.longitude}); true;`,
-      );
-    }
-  }, [selectedLaboratoryId, laboratories]);
-
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
-      const message = JSON.parse(event.nativeEvent.data) as { type?: string; id?: string };
-      if (message.type === 'selectLaboratory' && message.id) {
+      const message = JSON.parse(event.nativeEvent.data) as {
+        type?: string;
+        id?: string;
+        latitude?: number;
+        longitude?: number;
+      };
+      if (message.type === 'mapReady') {
+        readyRef.current = true;
+        updateMap();
+      } else if (
+        message.type === 'pickLocation' &&
+        typeof message.latitude === 'number' &&
+        typeof message.longitude === 'number'
+      ) {
+        onPickLocation?.({ latitude: message.latitude, longitude: message.longitude });
+      } else if (message.type === 'selectLaboratory' && message.id) {
         const selected = laboratories.find(item => item.id === message.id);
         if (selected) onSelectLaboratory(selected);
       }
     } catch {
-      // Ignore invalid messages from the embedded map.
+      // Abaikan pesan tidak valid dari peta.
     }
   };
 
   return (
     <View style={styles.container}>
-      <WebView
+      <MapWebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html }}
+        source={source}
         javaScriptEnabled
         domStorageEnabled
+        setSupportMultipleWindows={false}
         onMessage={handleMessage}
-        onLoadEnd={updateMap}
+        onShouldStartLoadWithRequest={(request: { url: string }) => {
+          // Tautan atribusi OSM/Leaflet dibuka di browser, bukan di dalam peta.
+          if (
+            request.url === OSM_WEBVIEW_BASE_URL ||
+            request.url.startsWith('about:') ||
+            request.url.startsWith('data:')
+          ) {
+            return true;
+          }
+          if (/^https?:\/\//.test(request.url)) {
+            void Linking.openURL(request.url);
+          }
+          return false;
+        }}
         style={styles.webView}
         nestedScrollEnabled
       />

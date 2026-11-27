@@ -17,11 +17,23 @@ import { useFirestoreSchedules } from '@/hooks/useFirestoreSchedules';
 import { useLaboratories } from '@/hooks/useLaboratories';
 import type { LaboratoryLocation } from '@/services/laboratoryMapService';
 import {
+  DEFAULT_LABORATORY_RADIUS_METERS,
+  MIN_LABORATORY_RADIUS_METERS,
+  updateLaboratory,
+} from '@/services/laboratoryService';
+import { showMessage } from '@/services/dialogService';
+import type { PickedCoordinate } from '@/components/laboratory-map/LaboratoryOSMMap.types';
+import {
   getCurrentMapLocation,
-  requestMapLocationPermission,
   watchMapLocation,
 } from '@/services/mapLocationAdapter';
 import type { DeviceCoordinates } from '@/services/mapLocationAdapter';
+import {
+  calculateDistanceMeters,
+  formatDistanceMeters,
+  openDeviceLocationSettings,
+} from '@/services/locationService';
+import type { LocationServiceError } from '@/types/location';
 import type { PracticumSchedule } from '@/services/practicumScheduleService';
 import { BottomNavigation } from '@/components/BottomNavigation';
 import type { NavigationProp } from '@/navigation/navigationTypes';
@@ -110,63 +122,47 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
     useState<LaboratoryLocation | null>(null);
   const [deviceLocation, setDeviceLocation] =
     useState<DeviceCoordinates | null>(null);
-  const [locationMessage, setLocationMessage] = useState(
-    'Memeriksa izin lokasi perangkat...',
-  );
+  const [locationError, setLocationError] =
+    useState<LocationServiceError | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [deviceFocusToken, setDeviceFocusToken] = useState(0);
+  const [watchKey, setWatchKey] = useState(0);
+  const [fitAllToken, setFitAllToken] = useState(0);
+  const [pickMode, setPickMode] = useState(false);
+  const [pickedLocation, setPickedLocation] = useState<PickedCoordinate | null>(null);
+  const [savingPosition, setSavingPosition] = useState(false);
 
-  const startLocationTracking = useCallback(async () => {
-    setLocationLoading(true);
-    setLocationMessage('Meminta izin lokasi perangkat...');
-
-    try {
-      const granted = await requestMapLocationPermission();
-      if (!granted) {
-        setDeviceLocation(null);
-        setLocationMessage(
-          'Izin lokasi ditolak. Aktifkan izin lokasi agar posisi Anda tampil di peta.',
-        );
-        return;
-      }
-
-      const current = await getCurrentMapLocation();
-      setDeviceLocation(current);
-      setLocationMessage('Lokasi perangkat berhasil diperbarui.');
-
-      const subscription = await watchMapLocation(coordinates => {
-        setDeviceLocation(coordinates);
-      });
-
-      return subscription;
-    } catch (error) {
-      setLocationMessage(
-        error instanceof Error
-          ? error.message
-          : 'Lokasi belum tersedia. Pastikan GPS perangkat aktif.',
-      );
-    } finally {
-      setLocationLoading(false);
-    }
-    return undefined;
-  }, []);
-
+  // Pemantauan lokasi berkelanjutan; dibersihkan otomatis saat layar ditutup.
   useEffect(() => {
-    let active = true;
-    let subscription: { remove: () => void } | undefined;
+    setLocationLoading(true);
+    const stop = watchMapLocation(
+      coordinates => {
+        setDeviceLocation(coordinates);
+        setLocationError(null);
+        setLocationLoading(false);
+      },
+      error => {
+        setLocationError(error);
+        setLocationLoading(false);
+      },
+    );
+    return stop;
+  }, [watchKey]);
 
-    void startLocationTracking().then(result => {
-      if (!active) {
-        result?.remove();
-        return;
-      }
-      subscription = result;
-    });
-
-    return () => {
-      active = false;
-      subscription?.remove();
-    };
-  }, [startLocationTracking]);
+  const refreshLocation = useCallback(async () => {
+    setLocationLoading(true);
+    const result = await getCurrentMapLocation();
+    if (result.ok) {
+      setDeviceLocation(result.data);
+      setLocationError(null);
+      setDeviceFocusToken(value => value + 1);
+      // Mulai ulang pemantauan jika sebelumnya gagal (mis. izin baru diberikan).
+      if (locationError) setWatchKey(value => value + 1);
+    } else {
+      setLocationError(result.error);
+    }
+    setLocationLoading(false);
+  }, [locationError]);
 
   useEffect(() => {
     if (!selectedLaboratory && laboratories.length > 0) {
@@ -251,6 +247,89 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
     return INDONESIA_CENTER;
   }, [deviceLocation, laboratories]);
 
+  const distanceToSelected = useMemo(() => {
+    if (!deviceLocation || !selectedLaboratory) return null;
+    try {
+      return calculateDistanceMeters(deviceLocation, selectedLaboratory);
+    } catch {
+      return null;
+    }
+  }, [deviceLocation, selectedLaboratory]);
+
+  const isAssistant = activeRole === 'assistant';
+
+  const distanceByLab = useMemo(() => {
+    const result: Record<string, number> = {};
+    if (!deviceLocation) return result;
+    for (const lab of laboratories) {
+      try {
+        result[lab.id] = calculateDistanceMeters(deviceLocation, lab);
+      } catch {
+        // koordinat tidak valid: lewati
+      }
+    }
+    return result;
+  }, [deviceLocation, laboratories]);
+
+  const startPickMode = () => {
+    setPickedLocation(null);
+    setPickMode(true);
+  };
+
+  const cancelPickMode = () => {
+    setPickMode(false);
+    setPickedLocation(null);
+  };
+
+  const savePickedPosition = async () => {
+    if (!selectedLaboratory || !pickedLocation) return;
+    setSavingPosition(true);
+    try {
+      await updateLaboratory(
+        selectedLaboratory.id,
+        {
+          name: selectedLaboratory.name,
+          building: selectedLaboratory.building || '-',
+          floor: selectedLaboratory.floor || '-',
+          latitude: Number(pickedLocation.latitude.toFixed(6)),
+          longitude: Number(pickedLocation.longitude.toFixed(6)),
+          radius:
+            selectedLaboratory.radius >= MIN_LABORATORY_RADIUS_METERS
+              ? selectedLaboratory.radius
+              : DEFAULT_LABORATORY_RADIUS_METERS,
+        },
+        { uid: activeUser.id, role: activeRole },
+      );
+      cancelPickMode();
+      showMessage('Berhasil', `Posisi "${selectedLaboratory.name}" diperbarui.`);
+    } catch (error) {
+      showMessage(
+        'Gagal menyimpan',
+        error instanceof Error ? error.message : 'Posisi laboratorium gagal disimpan.',
+      );
+    } finally {
+      setSavingPosition(false);
+    }
+  };
+
+  const lowAccuracy =
+    deviceLocation?.accuracy !== null &&
+    deviceLocation?.accuracy !== undefined &&
+    deviceLocation.accuracy > 50;
+
+  const locationHintText = locationError
+    ? locationError.message
+    : deviceLocation
+      ? `Lokasi Anda: ${deviceLocation.latitude.toFixed(5)}, ${deviceLocation.longitude.toFixed(5)}` +
+        (deviceLocation.accuracy !== null ? ` (±${Math.round(deviceLocation.accuracy)} m)` : '') +
+        (lowAccuracy ? ' — akurasi rendah, keluar ke area terbuka untuk hasil lebih tepat' : '') +
+        (distanceToSelected !== null && selectedLaboratory
+          ? ` · ${formatDistanceMeters(distanceToSelected)} dari ${selectedLaboratory.name}`
+          : '')
+      : locationLoading
+        ? 'Mengambil lokasi perangkat...'
+        : 'Lokasi perangkat belum tersedia.';
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar style="dark" />
@@ -261,20 +340,56 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
             Lokasi dan aktivitas praktikum secara real-time
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Perbarui lokasi"
-          onPress={() => {
-            void startLocationTracking().then(result => result?.remove());
-          }}
-          style={styles.locationButton}>
-          {locationLoading ? (
-            <ActivityIndicator color={APP_COLORS.primary} size="small" />
-          ) : (
-            <Ionicons name="locate-outline" size={21} color={APP_COLORS.primary} />
-          )}
-        </Pressable>
+        <View style={styles.headerButtons}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tampilkan semua laboratorium"
+            onPress={() => setFitAllToken(value => value + 1)}
+            style={styles.locationButton}>
+            <Ionicons name="albums-outline" size={20} color={APP_COLORS.primary} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Perbarui lokasi"
+            onPress={() => {
+              void refreshLocation();
+            }}
+            style={styles.locationButton}>
+            {locationLoading ? (
+              <ActivityIndicator color={APP_COLORS.primary} size="small" />
+            ) : (
+              <Ionicons name="locate-outline" size={21} color={APP_COLORS.primary} />
+            )}
+          </Pressable>
+        </View>
       </View>
+
+      {laboratories.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipScroll}
+          contentContainerStyle={styles.chipRow}>
+          {laboratories.map(lab => {
+            const active = lab.id === selectedLaboratory?.id;
+            const distance = distanceByLab[lab.id];
+            return (
+              <Pressable
+                key={lab.id}
+                accessibilityRole="button"
+                disabled={pickMode}
+                onPress={() => handleSelectLaboratory(lab)}
+                style={[styles.chip, active && styles.chipActive]}>
+                <View style={[styles.chipDot, active && styles.chipDotActive]} />
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                  {lab.name}
+                  {distance !== undefined ? ` · ${formatDistanceMeters(distance)}` : ''}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       <View style={styles.mapContainer}>
         <LaboratoryOSMMap
@@ -282,6 +397,11 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
           selectedLaboratoryId={selectedLaboratory?.id ?? null}
           deviceLocation={deviceLocation}
           initialCenter={mapCenter}
+          deviceFocusToken={deviceFocusToken}
+          fitAllToken={fitAllToken}
+          pickMode={pickMode}
+          pickedLocation={pickedLocation}
+          onPickLocation={setPickedLocation}
           onSelectLaboratory={handleSelectLaboratory}
         />
         <View style={styles.mapLegend}>
@@ -290,10 +410,21 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
             <Text style={styles.legendText}>Laboratorium</Text>
           </View>
           <View style={styles.legendItem}>
+            <View style={[styles.legendDot, styles.legendDotSelected]} />
+            <Text style={styles.legendText}>Lab terpilih</Text>
+          </View>
+          <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#2563EB' }]} />
             <Text style={styles.legendText}>Lokasi Anda</Text>
           </View>
         </View>
+        {pickMode ? (
+          <View style={styles.pickBanner}>
+            <Text style={styles.pickBannerText}>
+              Ketuk peta tepat di lokasi {selectedLaboratory?.name ?? 'laboratorium'}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.infoPanel}>
@@ -352,10 +483,67 @@ export const LaboratoryMapScreen: React.FC<LaboratoryMapScreenProps> = ({
             )}
           </ScrollView>
         )}
-        <Text style={styles.locationHint}>
-          <Ionicons name="location-outline" size={12} color={APP_COLORS.textSecondary} />{' '}
-          {locationMessage}
+        {selectedLaboratory ? (
+          <Text style={styles.locationHint}>
+            Koordinat lab: {selectedLaboratory.latitude.toFixed(6)}, {selectedLaboratory.longitude.toFixed(6)}
+          </Text>
+        ) : null}
+        {isAssistant && selectedLaboratory ? (
+          pickMode ? (
+            <View style={styles.pickActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!deviceLocation}
+                onPress={() => {
+                  if (deviceLocation) {
+                    setPickedLocation({
+                      latitude: deviceLocation.latitude,
+                      longitude: deviceLocation.longitude,
+                    });
+                  }
+                }}
+                style={[styles.settingsButton, !deviceLocation && styles.buttonDisabled]}>
+                <Text style={styles.settingsButtonText}>Pakai lokasi saya</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={!pickedLocation || savingPosition}
+                onPress={() => {
+                  void savePickedPosition();
+                }}
+                style={[styles.saveButton, (!pickedLocation || savingPosition) && styles.buttonDisabled]}>
+                <Text style={styles.saveButtonText}>
+                  {savingPosition ? 'Menyimpan...' : 'Simpan posisi'}
+                </Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={cancelPickMode} style={styles.settingsButton}>
+                <Text style={styles.settingsButtonText}>Batal</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable accessibilityRole="button" onPress={startPickMode} style={styles.settingsButton}>
+              <Text style={styles.settingsButtonText}>Atur posisi lab ini di peta</Text>
+            </Pressable>
+          )
+        ) : null}
+        <Text style={[styles.locationHint, locationError && styles.locationHintError]}>
+          <Ionicons
+            name="location-outline"
+            size={12}
+            color={locationError ? APP_COLORS.dangerText : APP_COLORS.textSecondary}
+          />{' '}
+          {locationHintText}
         </Text>
+        {locationError?.canOpenSettings ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              void openDeviceLocationSettings();
+            }}
+            style={styles.settingsButton}>
+            <Text style={styles.settingsButtonText}>Buka Pengaturan</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <BottomNavigation
@@ -408,6 +596,94 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: APP_COLORS.border,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chipScroll: {
+    flexGrow: 0,
+    marginBottom: APP_SPACING.sm,
+  },
+  chipRow: {
+    paddingHorizontal: APP_SPACING.md,
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: APP_RADIUS.pill,
+    backgroundColor: APP_COLORS.white,
+    borderWidth: 1,
+    borderColor: APP_COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  chipActive: {
+    backgroundColor: APP_COLORS.primary,
+    borderColor: APP_COLORS.primary,
+  },
+  chipDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    backgroundColor: '#D97706',
+  },
+  chipDotActive: {
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  chipText: {
+    fontFamily: APP_FONTS.semiBold,
+    color: APP_COLORS.inkPrimary,
+    fontSize: 11,
+  },
+  chipTextActive: {
+    color: APP_COLORS.white,
+  },
+  legendDotSelected: {
+    backgroundColor: '#F59E0B',
+    borderWidth: 2,
+    borderColor: '#17184B',
+  },
+  pickBanner: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    right: 12,
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  pickBannerText: {
+    color: '#fff',
+    fontFamily: APP_FONTS.semiBold,
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  pickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  saveButton: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderRadius: APP_RADIUS.pill,
+    backgroundColor: APP_COLORS.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  saveButtonText: {
+    fontFamily: APP_FONTS.semiBold,
+    color: APP_COLORS.white,
+    fontSize: 10,
+  },
+  buttonDisabled: {
+    opacity: 0.4,
+  },
   mapContainer: {
     flex: 1,
     minHeight: 220,
@@ -450,7 +726,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: APP_SPACING.lg,
     paddingTop: APP_SPACING.md,
     paddingBottom: APP_SPACING.sm,
-    maxHeight: 260,
+    maxHeight: 300,
     minHeight: 190,
   },
   panelHeading: {
@@ -559,6 +835,22 @@ const styles = StyleSheet.create({
     color: APP_COLORS.textSecondary,
     fontSize: 9,
     marginTop: 5,
+  },
+  locationHintError: {
+    color: APP_COLORS.dangerText,
+  },
+  settingsButton: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    borderRadius: APP_RADIUS.pill,
+    backgroundColor: APP_COLORS.softBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  settingsButtonText: {
+    fontFamily: APP_FONTS.semiBold,
+    color: APP_COLORS.primary,
+    fontSize: 10,
   },
 });
 
